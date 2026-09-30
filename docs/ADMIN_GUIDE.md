@@ -57,7 +57,7 @@ Sidebar → **Settings**. These values appear across the whole website (header, 
 | Contact phone | `+20 150 731 1232` | Used for the phone link **and** WhatsApp. Keep this exact format. |
 | Address | `6th October, Giza, Egypt` | Must match Google Business Profile exactly. |
 | Address (Arabic) | `السادس من أكتوبر، الجيزة، مصر` | |
-| Announcement text | `Built with إتقان — mastery` | The small badge above the homepage headline. **Leave empty to hide it.** Don't repeat the headline here. |
+| Announcement text | `ETQAN means mastery` | The small badge above the homepage headline. **Leave empty to hide it.** Don't repeat the headline here. Keep Arabic words out of English fields. |
 | Announcement text (Arabic) | `صُنع بإتقان` | |
 | Hero subtitle | `ETQAN designs, builds and markets websites, mobile apps and custom business software for companies in Egypt and the Gulf — engineering and marketing under one roof.` | The paragraph under the homepage headline. |
 | Hero subtitle (Arabic) | `في إتقان نصمّم ونطوّر ونسوّق المواقع الإلكترونية وتطبيقات الجوال والأنظمة المخصصة للشركات في مصر والخليج — هندسة وتسويق تحت سقف واحد.` | |
