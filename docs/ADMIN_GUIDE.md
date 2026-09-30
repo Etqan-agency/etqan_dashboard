@@ -53,7 +53,7 @@ Sidebar → **Settings**. These values appear across the whole website (header, 
 
 | Field | Enter | Notes |
 |---|---|---|
-| Contact email | `hello@etqanagency.com` | Shown in the footer and contact page; leads also go here. |
+| Contact email | `admin@etqanpp.com` | Shown in the footer and contact page; leads also go here. |
 | Contact phone | `+20 150 731 1232` | Used for the phone link **and** WhatsApp. Keep this exact format. |
 | Address | `6th October, Giza, Egypt` | Must match Google Business Profile exactly. |
 | Address (Arabic) | `السادس من أكتوبر، الجيزة، مصر` | |

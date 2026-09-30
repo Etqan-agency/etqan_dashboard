@@ -191,7 +191,7 @@ const settings: SiteSettings = {
     { title: "Build for the maintainer", description: "The next engineer to open the codebase is the real user." },
   ],
   stats: { projects: 8, clients: 7, industries: 7, satisfaction: 92, awards: 3 },
-  contact_email: "work@etqan.agency",
+  contact_email: "admin@etqanpp.com",
   contact_phone: "+20 000 000 0000",
   address: "Cairo, Egypt",
   social_links: { linkedin: "https://www.linkedin.com/company/etqan-agency", github: "https://github.com/Abdulkhalek-1", x: "https://x.com/etqanagency" },
