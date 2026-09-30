@@ -11,9 +11,12 @@ const CONTENT: { href: string; label: string; icon: IconName }[] = [
   { href: "/services", label: "Services", icon: "spark" },
   { href: "/projects", label: "Portfolio", icon: "layers" },
   { href: "/blog", label: "Blog", icon: "pen" },
+  { href: "/authors", label: "Authors", icon: "users" },
   { href: "/opinions", label: "Testimonials", icon: "quote" },
   { href: "/team", label: "Team", icon: "users" },
   { href: "/clients", label: "Clients", icon: "badge" },
+  { href: "/faqs", label: "FAQs", icon: "help" },
+  { href: "/redirects", label: "Redirects", icon: "arrow" },
 ];
 
 const SITE: { href: string; label: string; icon: IconName }[] = [
