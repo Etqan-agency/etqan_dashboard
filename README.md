@@ -1,10 +1,13 @@
 # Etqan Admin
 
-Content dashboard for etqan.agency. Next.js 15 (App Router) + React 19 + Tailwind 4,
+Content dashboard for the ETQAN website (www.etqanpp.com). Next.js 15 (App Router) + React 19 + Tailwind 4,
 wired to the Django REST backend documented in the API reference.
 
 It ships with a built-in sample dataset, so it deploys and works before the backend
 is reachable.
+
+> **Content editors:** see [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) for what to enter in each
+> section (settings, services, portfolio, blog, authors, FAQs, leads) once the site is live.
 
 ---
 
