@@ -40,3 +40,21 @@ export function capitalise(s: string) {
 export function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
 }
+
+/** True for a full http(s) URL such as https://www.linkedin.com/company/etqan. */
+export function isHttpUrl(value: unknown) {
+  const s = String(value ?? "").trim();
+  if (!/^https?:\/\//i.test(s)) return false;
+  try {
+    return Boolean(new URL(s).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Keys of a kv object whose values are not full http(s) URLs. */
+export function invalidUrlKeys(value: Record<string, unknown> | null | undefined) {
+  return Object.entries(value ?? {})
+    .filter(([, v]) => !isHttpUrl(v))
+    .map(([k]) => k);
+}

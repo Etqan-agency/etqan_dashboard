@@ -8,11 +8,24 @@ export type FieldType =
   | "text"
   | "number"
   | "textarea"
+  | "markdown"
   | "select"
   | "bool"
   | "chips"
   | "kv"
+  | "results"
   | "image";
+
+/** Load select options from another collection, e.g. services or opinions. */
+export interface OptionsSource {
+  path: string;
+  /** record key stored as the option value */
+  value: string;
+  /** record key shown as the option label */
+  label: string;
+  /** label of the leading "no value" option (sent as null) */
+  empty: string;
+}
 
 export interface FieldDef {
   name: string;
@@ -24,8 +37,20 @@ export interface FieldDef {
   tall?: boolean;
   maxLength?: number;
   options?: [string, string][];
+  /** fetch select options from the API instead of a static list */
+  optionsFrom?: OptionsSource;
+  /** number inputs: an empty box saves as null instead of 0 */
+  nullable?: boolean;
   /** read the initial value from a different (read-only) field, e.g. tags → tag_slugs */
   readFrom?: string;
+  /** text direction for text/textarea/chips inputs — "rtl" for Arabic fields */
+  dir?: "rtl" | "ltr";
+  /** initial value for a NEW record (overrides the per-type empty value) */
+  default?: unknown;
+  /** image inputs: offer "Remove image" (saved as null). Needs a nullable model field. Default true. */
+  clearable?: boolean;
+  /** kv inputs: every value must be a full http(s) URL */
+  urlValues?: boolean;
 }
 
 export interface ColumnDef {
@@ -82,6 +107,23 @@ const ACTIVE_FILTER: FilterDef = {
   ],
 };
 
+/**
+ * Arabic twin of an English field (backend `<name>_ar`). Optional: the public
+ * API (`?lang=ar`) falls back to the English value when it is left blank.
+ */
+const ar = (def: FieldDef): FieldDef => ({
+  name: `${def.name}_ar`,
+  label: `${def.label} (Arabic)`,
+  type: def.type,
+  tall: def.tall,
+  maxLength: def.maxLength,
+  dir: "rtl",
+  hint: "Leave blank to use the English text.",
+});
+
+/** An English field followed by its Arabic twin. */
+const withAr = (def: FieldDef): FieldDef[] => [def, ar(def)];
+
 const ORDER_FIELD: FieldDef = { name: "order", label: "Order", type: "number", hint: "Lower numbers appear first." };
 const ACTIVE_FIELD: FieldDef = {
   name: "is_active",
@@ -89,6 +131,39 @@ const ACTIVE_FIELD: FieldDef = {
   type: "bool",
   hint: "Hidden records are dropped from the public API.",
 };
+
+/** SEO overrides shared by services, projects and blog (backend `SeoFields`). */
+const META_TITLE: FieldDef = { name: "meta_title", label: "Meta title", type: "text", maxLength: 200, hint: "Leave blank to use the title." };
+const META_DESCRIPTION: FieldDef = { name: "meta_description", label: "Meta description", type: "textarea", maxLength: 300 };
+const SEO_FIELDS: FieldDef[] = [
+  META_TITLE,
+  META_DESCRIPTION,
+  {
+    name: "og_image",
+    label: "Social share image",
+    type: "image",
+    clearable: false,
+    hint: "Open Graph image. Falls back to the main image.",
+  },
+  {
+    name: "canonical_url",
+    label: "Canonical URL",
+    type: "text",
+    hint: "Optional full URL (https://…). Leave blank to use this page's own URL.",
+  },
+  { name: "noindex", label: "Hide from search engines", type: "bool", hint: "Adds noindex to this page." },
+];
+/** Blog posts also carry Arabic meta title/description. */
+const BLOG_SEO_FIELDS: FieldDef[] = [...withAr(META_TITLE), ...withAr(META_DESCRIPTION), ...SEO_FIELDS.slice(2)];
+
+/** Editable URL slug for services, projects, blog posts and authors. `maxLength` mirrors the model's SlugField. */
+const slugField = (maxLength: number): FieldDef => ({
+  name: "slug",
+  label: "Slug",
+  type: "text",
+  maxLength,
+  hint: "Lowercase letters, digits and hyphens. Leave blank to generate from the title. Changing it creates a 301 redirect from the old URL.",
+});
 
 export const RESOURCES: Record<string, ResourceDef> = {
   services: {
@@ -102,21 +177,36 @@ export const RESOURCES: Record<string, ResourceDef> = {
     defaultOrder: "order",
     filters: [ACTIVE_FILTER],
     columns: [
-      { header: "Service", cell: (r) => nameWithSub(r.title, mono(`/${r.slug ?? ""}`)) },
+      { header: "Service", cell: (r) => withThumb(r.image, nameWithSub(r.title, mono(`/${r.slug ?? ""}`))) },
       { header: "Summary", cell: (r) => muted(truncate(r.short_description, 70)) },
-      { header: "Features", cell: (r) => <span className="tag">{(r.features ?? []).length} listed</span> },
+      { header: "Tags", cell: (r) => <span className="tag">{(r.features ?? []).length} listed</span> },
       { header: "Order", cell: (r) => mono(r.order ?? 0) },
       { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
     ],
     fields: [
-      { name: "title", label: "Title", type: "text", required: true },
-      { name: "slug", label: "Slug", type: "text", readOnly: true, hint: "Generated from the title by the server." },
-      { name: "short_description", label: "Short description", type: "textarea" },
-      { name: "long_description", label: "Long description", type: "textarea", tall: true },
-      { name: "icon", label: "Icon key", type: "text", hint: "Whatever key your frontend icon map expects." },
-      { name: "features", label: "Features", type: "chips", hint: "Press Enter after each one." },
+      ...withAr({ name: "title", label: "Title", type: "text", required: true, maxLength: 150 }),
+      slugField(170),
+      ...withAr({
+        name: "short_description",
+        label: "Short description",
+        type: "textarea",
+        required: true,
+        maxLength: 255,
+        hint: "Shown on the website under Our Expertise.",
+      }),
+      { name: "image", label: "Image", type: "image", hint: "Shown beside the service on the website." },
+      {
+        name: "icon",
+        label: "Icon key",
+        type: "text",
+        maxLength: 80,
+        hint: "Optional short icon name, e.g. code, phone, pen, gear, chip. The backend stores it as free text; the website does not show service icons yet.",
+      },
+      ...withAr({ name: "long_description", label: "Long description", type: "textarea", tall: true }),
+      ...withAr({ name: "features", label: "Tags", type: "chips", hint: "Short tags shown next to the description. Press Enter after each one." }),
       ORDER_FIELD,
       ACTIVE_FIELD,
+      ...SEO_FIELDS,
     ],
   },
 
@@ -141,6 +231,14 @@ export const RESOURCES: Record<string, ResourceDef> = {
         ],
       },
       {
+        param: "ownership",
+        options: [
+          ["", "All owners"],
+          ["etqan", "ETQAN project"],
+          ["team", "Team experience"],
+        ],
+      },
+      {
         param: "featured",
         options: [
           ["", "All projects"],
@@ -156,6 +254,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
       },
       { header: "Category", cell: (r) => <Badge tone="blue">{r.category_display ?? r.category ?? "—"}</Badge> },
       {
+        header: "Ownership",
+        cell: (r) => (r.ownership === "team" ? <Badge tone="draft">Team experience</Badge> : faint("ETQAN")),
+      },
+      {
         header: "Stack",
         cell: (r) => {
           const stack: string[] = r.tech_stack ?? [];
@@ -166,8 +268,8 @@ export const RESOURCES: Record<string, ResourceDef> = {
       { header: "Status", cell: (r) => <StatusBadge on={r.published} onLabel="Published" offLabel="Draft" /> },
     ],
     fields: [
-      { name: "title", label: "Title", type: "text", required: true },
-      { name: "slug", label: "Slug", type: "text", readOnly: true },
+      ...withAr({ name: "title", label: "Title", type: "text", required: true, maxLength: 200 }),
+      slugField(220),
       {
         name: "category",
         label: "Category",
@@ -179,15 +281,67 @@ export const RESOURCES: Record<string, ResourceDef> = {
           ["enterprise", "Enterprise"],
         ],
       },
-      { name: "summary", label: "Summary", type: "textarea", maxLength: 300, hint: "Max 300 characters." },
-      { name: "description", label: "Description", type: "textarea", tall: true },
-      { name: "cover_image", label: "Cover image", type: "image" },
-      { name: "tech_stack", label: "Tech stack", type: "chips" },
+      {
+        name: "ownership",
+        label: "Ownership",
+        type: "select",
+        options: [
+          ["etqan", "ETQAN project"],
+          ["team", "Built by our team (prior experience)"],
+        ],
+        hint: "Use “team” for work our founder/team built at previous employers — it is labelled as team experience, never as ETQAN client work.",
+      },
+      ...withAr({
+        name: "contribution",
+        label: "Our contribution",
+        type: "textarea",
+        hint: "What ETQAN / our team member actually did on this project.",
+      }),
+      ...withAr({ name: "summary", label: "Summary", type: "textarea", required: true, maxLength: 300, hint: "Max 300 characters." }),
+      ...withAr({
+        name: "description",
+        label: "What we built",
+        type: "textarea",
+        tall: true,
+        hint: "One feature per line — each line becomes a bullet on the case study.",
+      }),
+      { name: "cover_image", label: "Cover image", type: "image", hint: "Optional. Projects without a cover show a branded placeholder." },
+      ...withAr({ name: "tech_stack", label: "Scope", type: "chips", hint: "e.g. UI/UX Design, Web Development." }),
+      ...withAr({ name: "challenge", label: "Challenge", type: "textarea", hint: "Case study: the problem the client had." }),
+      ...withAr({ name: "solution", label: "Solution", type: "textarea", hint: "Case study: what we did about it." }),
+      ...withAr({ name: "architecture", label: "Architecture", type: "textarea", hint: "Case study: how it is built." }),
+      ...withAr({
+        name: "results",
+        label: "Results",
+        type: "results",
+        hint: "Real, measured numbers only, each with its source. Never estimates or placeholders.",
+      }),
+      { name: "year", label: "Year", type: "number", nullable: true, hint: "Year of delivery. Leave blank to hide." },
+      ...withAr({ name: "duration", label: "Duration", type: "text", maxLength: 100, hint: "e.g. 12 weeks." }),
+      ...withAr({ name: "country", label: "Country", type: "text", maxLength: 100 }),
+      ...withAr({ name: "industry", label: "Industry", type: "text", maxLength: 100 }),
+      {
+        name: "service_slugs",
+        label: "Services",
+        type: "chips",
+        readFrom: "services",
+        hint: "Service slugs, e.g. web-development. Inactive services stay linked here but are not shown on the website.",
+      },
+      {
+        name: "testimonial_id",
+        label: "Testimonial",
+        type: "select",
+        optionsFrom: { path: "/api/opinions/", value: "id", label: "author_name", empty: "No testimonial" },
+        hint: "Client quote shown on the case study. Hidden testimonials are not shown.",
+      },
       { name: "client_name", label: "Client name", type: "text" },
-      { name: "live_url", label: "Live URL", type: "text" },
+      { name: "live_url", label: "Live URL", type: "text", hint: "Website link." },
+      { name: "play_store_url", label: "Google Play URL", type: "text" },
+      { name: "app_store_url", label: "App Store URL", type: "text" },
       ORDER_FIELD,
-      { name: "is_featured", label: "Featured", type: "bool", hint: "Featured projects lead the Work page." },
-      { name: "published", label: "Published", type: "bool", hint: "Drafts are hidden from the public API." },
+      { name: "is_featured", label: "Featured", type: "bool", hint: "Featured projects are listed first on the Projects page." },
+      { name: "published", label: "Published", type: "bool", default: true, hint: "Drafts are hidden from the public API." },
+      ...SEO_FIELDS,
     ],
   },
 
@@ -196,7 +350,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
     lookup: "slug",
     title: "Blog",
     noun: "post",
-    sub: "The author is set to you automatically. Publishing stamps published_at the first time only.",
+    sub: "Pick the author shown as the byline (defaults to your linked author profile). Publishing stamps published_at the first time only.",
     icon: "pen",
     ordering: ["published_at", "created_at", "title"],
     defaultOrder: "-published_at",
@@ -228,26 +382,90 @@ export const RESOURCES: Record<string, ResourceDef> = {
           );
         },
       },
-      { header: "Author", cell: (r) => muted(r.author?.name ?? "—") },
+      {
+        header: "Author",
+        cell: (r) => (r.author?.slug ? muted(r.author.name) : r.author?.name ? faint(`${r.author.name} (no profile)`) : faint("—")),
+      },
       { header: "Published", cell: (r) => (r.published_at ? mono(formatDate(r.published_at)) : faint("—")) },
       { header: "Status", cell: (r) => <StatusBadge on={r.published} onLabel="Published" offLabel="Draft" /> },
     ],
     fields: [
-      { name: "title", label: "Title", type: "text", required: true },
-      { name: "slug", label: "Slug", type: "text", readOnly: true },
+      ...withAr({ name: "title", label: "Title", type: "text", required: true, maxLength: 220 }),
+      slugField(240),
       { name: "cover_image", label: "Cover image", type: "image" },
-      { name: "excerpt", label: "Excerpt", type: "textarea" },
-      { name: "body", label: "Body", type: "textarea", tall: true },
+      ...withAr({ name: "excerpt", label: "Excerpt", type: "textarea", maxLength: 300 }),
+      ...withAr({
+        name: "body",
+        label: "Body",
+        type: "markdown",
+        required: true,
+        hint: "Markdown. Use H2/H3 for sections; images are uploaded and inserted at the cursor.",
+      }),
+      {
+        name: "author_profile",
+        label: "Author",
+        type: "select",
+        optionsFrom: { path: "/api/authors/", value: "slug", label: "name", empty: "No author (uses your account name)" },
+        hint: "Byline linking to the author page. Manage authors under Authors.",
+      },
       {
         name: "tag_slugs",
         label: "Tags",
         type: "chips",
         readFrom: "tags",
-        hint: "Write-only field. Tags that do not exist yet are created on save.",
+        hint: "Type tag names. Existing tags are matched by name or slug; new ones are created on save.",
       },
-      { name: "meta_title", label: "Meta title", type: "text" },
-      { name: "meta_description", label: "Meta description", type: "textarea" },
-      { name: "published", label: "Published", type: "bool" },
+      { name: "published", label: "Published", type: "bool", default: false, hint: "New posts start as drafts." },
+      ...BLOG_SEO_FIELDS,
+    ],
+  },
+
+  authors: {
+    path: "/api/authors/",
+    lookup: "slug",
+    title: "Authors",
+    noun: "author",
+    sub: "Blog bylines. Each author gets a public page at /authors/<slug> listing their published posts.",
+    icon: "users",
+    ordering: ["name", "created_at"],
+    defaultOrder: "name",
+    filters: [ACTIVE_FILTER],
+    columns: [
+      { header: "Author", cell: (r) => withThumb(r.photo, nameWithSub(r.name, mono(`/authors/${r.slug ?? ""}`)), true) },
+      { header: "Role", cell: (r) => muted(r.role || "—") },
+      { header: "Posts", cell: (r) => mono(r.post_count ?? 0) },
+      {
+        header: "Profiles",
+        cell: (r) => {
+          const links: string[] = r.same_as ?? [];
+          return links.length ? <span className="tag">{links.length} linked</span> : faint("—");
+        },
+      },
+      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
+    ],
+    fields: [
+      ...withAr({ name: "name", label: "Display name", type: "text", required: true, maxLength: 150 }),
+      {
+        ...slugField(170),
+        hint: "Lowercase letters, digits and hyphens. Leave blank to generate from the name. Changing it creates a 301 redirect from the old URL.",
+      },
+      ...withAr({ name: "role", label: "Role", type: "text", maxLength: 150, hint: "Job title, e.g. Founder & Lead Engineer." }),
+      { name: "photo", label: "Photo", type: "image", hint: "Square headshot works best." },
+      ...withAr({ name: "bio", label: "Bio", type: "textarea" }),
+      {
+        name: "same_as",
+        label: "Profile links",
+        type: "chips",
+        hint: "Full URLs (https://…) of this person's LinkedIn, GitHub, X… Used for search-engine author signals.",
+      },
+      {
+        name: "user_email",
+        label: "Linked staff login",
+        type: "text",
+        maxLength: 254,
+        hint: "Email of a staff account. Link this author to a staff login so new posts default to this byline. Leave blank for none.",
+      },
+      { ...ACTIVE_FIELD, hint: "Hidden authors have no public page." },
     ],
   },
 
@@ -268,9 +486,9 @@ export const RESOURCES: Record<string, ResourceDef> = {
       { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
     ],
     fields: [
-      { name: "quote", label: "Quote", type: "textarea", required: true },
+      ...withAr({ name: "quote", label: "Quote", type: "textarea", required: true }),
       { name: "author_name", label: "Author name", type: "text", required: true },
-      { name: "author_role", label: "Role / company", type: "text" },
+      ...withAr({ name: "author_role", label: "Role / company", type: "text" }),
       { name: "avatar", label: "Avatar", type: "image" },
       ORDER_FIELD,
       ACTIVE_FIELD,
@@ -311,10 +529,16 @@ export const RESOURCES: Record<string, ResourceDef> = {
     ],
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
-      { name: "role", label: "Role", type: "text" },
+      ...withAr({ name: "role", label: "Role", type: "text", required: true, maxLength: 150 }),
       { name: "photo", label: "Photo", type: "image" },
-      { name: "bio", label: "Bio", type: "textarea" },
-      { name: "socials", label: "Social links", type: "kv", hint: "Keys such as linkedin, github, x." },
+      ...withAr({ name: "bio", label: "Bio", type: "textarea" }),
+      {
+        name: "socials",
+        label: "Social links",
+        type: "kv",
+        urlValues: true,
+        hint: "Keys such as linkedin, github, x. Use full URLs, e.g. https://www.linkedin.com/in/…",
+      },
       ORDER_FIELD,
       ACTIVE_FIELD,
     ],
@@ -342,6 +566,94 @@ export const RESOURCES: Record<string, ResourceDef> = {
       { name: "website", label: "Website", type: "text" },
       ORDER_FIELD,
       ACTIVE_FIELD,
+    ],
+  },
+
+  faqs: {
+    path: "/api/faqs/",
+    lookup: "id",
+    title: "FAQs",
+    noun: "FAQ",
+    sub: "Questions and answers. Link one to a service, or leave the service blank for a general FAQ.",
+    icon: "help",
+    ordering: ["order", "created_at"],
+    defaultOrder: "order",
+    filters: [
+      ACTIVE_FILTER,
+      {
+        param: "general",
+        options: [
+          ["", "All FAQs"],
+          ["true", "General"],
+          ["false", "Service FAQs"],
+        ],
+      },
+    ],
+    columns: [
+      { header: "Question", cell: (r) => nameWithSub(truncate(r.question, 80), truncate(r.answer, 90)) },
+      { header: "Service", cell: (r) => (r.service ? mono(r.service) : faint("General")) },
+      { header: "Order", cell: (r) => mono(r.order ?? 0) },
+      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
+    ],
+    fields: [
+      ...withAr({ name: "question", label: "Question", type: "text", required: true, maxLength: 300 }),
+      ...withAr({ name: "answer", label: "Answer", type: "textarea", required: true }),
+      {
+        name: "service",
+        label: "Service",
+        type: "select",
+        optionsFrom: { path: "/api/services/", value: "slug", label: "title", empty: "General (no service)" },
+      },
+      ORDER_FIELD,
+      ACTIVE_FIELD,
+    ],
+  },
+
+  redirects: {
+    path: "/api/redirects/",
+    lookup: "id",
+    title: "Redirects",
+    noun: "redirect",
+    sub: "Permanent (301) or temporary (302) redirects for the public site. Changing a slug adds one automatically.",
+    icon: "arrow",
+    ordering: ["created_at", "updated_at", "old_path", "hits"],
+    defaultOrder: "-created_at",
+    filters: [
+      {
+        param: "is_permanent",
+        options: [
+          ["", "All redirects"],
+          ["true", "Permanent (301)"],
+          ["false", "Temporary (302)"],
+        ],
+      },
+    ],
+    columns: [
+      { header: "From", cell: (r) => mono(r.old_path) },
+      { header: "To", cell: (r) => mono(r.new_path) },
+      { header: "Type", cell: (r) => (r.is_permanent ? <Badge tone="blue">301</Badge> : <Badge tone="warn">302</Badge>) },
+      { header: "Hits", cell: (r) => mono(r.hits ?? 0) },
+      { header: "Updated", cell: (r) => mono(formatDate(r.updated_at)) },
+    ],
+    fields: [
+      {
+        name: "old_path",
+        label: "Old path",
+        type: "text",
+        required: true,
+        maxLength: 300,
+        hint: 'e.g. /services/mobile-apps. Starts with "/", no trailing slash and no /ar prefix (Arabic URLs are covered automatically).',
+      },
+      {
+        name: "new_path",
+        label: "New path",
+        type: "text",
+        required: true,
+        maxLength: 300,
+        hint: "e.g. /services/mobile-app-development. Site-relative, without the /ar prefix.",
+      },
+      { name: "is_permanent", label: "Permanent (301)", type: "bool", default: true, hint: "Turn off for a temporary (302) redirect." },
+      { name: "hits", label: "Hits", type: "number", readOnly: true, hint: "How many times this redirect was followed." },
     ],
   },
 };

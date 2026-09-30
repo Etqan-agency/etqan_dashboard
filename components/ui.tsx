@@ -5,7 +5,7 @@ import { Icon, type IconName } from "./Icon";
 import { cx } from "@/lib/utils";
 
 /* ---------------- Badge ---------------- */
-export function Badge({ tone, children }: { tone: "live" | "draft" | "blue" | "warn" | "late"; children: ReactNode }) {
+export function Badge({ tone, children }: { tone: "live" | "draft" | "blue" | "warn" | "late" | "sky"; children: ReactNode }) {
   return <span className={`badge b-${tone}`}>{children}</span>;
 }
 

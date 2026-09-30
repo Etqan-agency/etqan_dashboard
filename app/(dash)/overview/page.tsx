@@ -17,7 +17,7 @@ interface Counts {
   unread: number;
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://etqan.agency";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.etqanpp.com";
 
 export default function OverviewPage() {
   const toast = useToast();
@@ -195,7 +195,7 @@ export default function OverviewPage() {
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>{m.subject || m.name}</div>
                   <div style={{ fontSize: 11.5, color: "var(--color-faint)", marginTop: 2 }}>
-                    {m.name} · {m.email} · {timeAgo(m.created_at)}
+                    {m.name} · {m.email || m.phone || "no contact"} · {timeAgo(m.created_at)}
                   </div>
                 </div>
               </Link>

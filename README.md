@@ -12,7 +12,7 @@ is reachable.
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3001  (the website uses 3000)
 ```
 
 Then push the folder to a Git repo and import it at vercel.com, or:
@@ -29,8 +29,12 @@ Set one variable in **Vercel → Settings → Environment Variables** (or `.env.
 for development):
 
 ```
-NEXT_PUBLIC_API_BASE=https://api.etqan.agency
+NEXT_PUBLIC_API_BASE=https://<host>/etqan_api
 ```
+
+Use the backend's base URL **without** the trailing `/api` — the dashboard appends
+`/api/...` to every request itself (so the value above yields
+`https://<host>/etqan_api/api/services/`). Locally, `cp .env.example .env.local` points it at `http://localhost:8000`.
 
 Setting it flips the whole app from the mock adapter to live `fetch` calls and turns
 the login screen into a real JWT sign-in. Unset it and you are back on sample data.
@@ -38,7 +42,7 @@ the login screen into a real JWT sign-in. Unset it and you are back on sample da
 Optional:
 
 ```
-NEXT_PUBLIC_SITE_URL=https://etqan.agency   # target of the "View site" button
+NEXT_PUBLIC_SITE_URL=https://www.etqanpp.com   # target of the "View site" button (this is the default)
 ```
 
 ### CORS
@@ -49,8 +53,12 @@ The dashboard is a browser client on a different origin, so Django needs to allo
 # settings.py
 INSTALLED_APPS += ["corsheaders"]
 MIDDLEWARE.insert(0, "corsheaders.middleware.CorsMiddleware")
-CORS_ALLOWED_ORIGINS = ["https://your-project.vercel.app", "http://localhost:3000"]
+CORS_ALLOWED_ORIGINS = ["https://your-dashboard-host.example", "http://localhost:3001"]
 ```
+
+The backend must allow the dashboard's own origin — `http://localhost:3001` locally
+(the dashboard's dev/start port) and the deployed dashboard URL in production.
+The website's origin (`:3000`) is a separate entry.
 
 Without this every request fails in the browser while working fine in curl.
 

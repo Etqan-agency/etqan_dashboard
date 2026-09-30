@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Icon } from "./Icon";
-import type { FieldDef } from "@/lib/resources";
+import { MarkdownEditor } from "./MarkdownEditor";
+import { api } from "@/lib/api";
+import type { FieldDef, OptionsSource } from "@/lib/resources";
+import type { ProjectResult } from "@/lib/types";
+import { isHttpUrl } from "@/lib/utils";
 
 export function Field({ label, hint, required, children }: { label?: string; hint?: string; required?: boolean; children: ReactNode }) {
   return (
@@ -76,7 +80,15 @@ export function ToggleRow({
   );
 }
 
-export function ChipsInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+export function ChipsInput({
+  value,
+  onChange,
+  dir,
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  dir?: "rtl" | "ltr";
+}) {
   const [draft, setDraft] = useState("");
   const commit = () => {
     const v = draft.trim().replace(/,$/, "");
@@ -85,6 +97,7 @@ export function ChipsInput({ value, onChange }: { value: string[]; onChange: (v:
   };
   return (
     <div
+      dir={dir}
       style={{
         border: "1px solid var(--color-line)",
         borderRadius: "var(--radius-md)",
@@ -145,10 +158,13 @@ export function KeyValueInput({
   value,
   onChange,
   keyPlaceholder = "key",
+  urlValues,
 }: {
   value: Record<string, string | number>;
   onChange: (v: Record<string, string>) => void;
   keyPlaceholder?: string;
+  /** flag values that are not full http(s) URLs */
+  urlValues?: boolean;
 }) {
   const entries = Object.entries(value ?? {});
   const update = (rows: [string, string][]) => {
@@ -178,7 +194,9 @@ export function KeyValueInput({
           <input
             className="input"
             value={v}
-            placeholder="value"
+            placeholder={urlValues ? "https://…" : "value"}
+            aria-invalid={urlValues && k.trim() !== "" && !isHttpUrl(v) ? true : undefined}
+            style={urlValues && k.trim() !== "" && !isHttpUrl(v) ? { borderColor: "var(--color-clay)" } : undefined}
             onChange={(e) => {
               const next = [...rows];
               next[i] = [k, e.target.value];
@@ -213,18 +231,127 @@ export function KeyValueInput({
         <Icon name="plus" size={13} strokeWidth={2.2} />
         Add pair
       </button>
+      {urlValues && rows.some(([k, v]) => k.trim() && !isHttpUrl(v)) ? (
+        <div className="hint" style={{ color: "var(--color-clay)", marginTop: 6 }}>
+          Values must be full URLs starting with http:// or https://.
+        </div>
+      ) : null}
     </div>
   );
+}
+
+/** Repeatable value / label / source rows for case-study results. */
+export function ResultsInput({
+  value,
+  onChange,
+  dir,
+}: {
+  value: ProjectResult[];
+  onChange: (v: ProjectResult[]) => void;
+  dir?: "rtl" | "ltr";
+}) {
+  const rows = Array.isArray(value) ? value : [];
+  const set = (i: number, key: keyof ProjectResult, v: string) => {
+    const next = rows.map((r, j) => (j === i ? { ...r, [key]: v } : r));
+    onChange(next);
+  };
+  return (
+    <div dir={dir}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: "flex", gap: 7, marginBottom: 7 }}>
+          <input
+            className="input"
+            style={{ maxWidth: 110 }}
+            value={r.value ?? ""}
+            placeholder="42%"
+            onChange={(e) => set(i, "value", e.target.value)}
+          />
+          <input
+            className="input"
+            value={r.label ?? ""}
+            placeholder="label"
+            onChange={(e) => set(i, "label", e.target.value)}
+          />
+          <input
+            className="input"
+            value={r.source ?? ""}
+            placeholder="source"
+            onChange={(e) => set(i, "source", e.target.value)}
+          />
+          <button
+            type="button"
+            aria-label="Remove result"
+            onClick={() => onChange(rows.filter((_, j) => j !== i))}
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--color-line)",
+              display: "grid",
+              placeItems: "center",
+              color: "var(--color-faint)",
+              flex: "none",
+            }}
+          >
+            <Icon name="trash" size={14} />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        onClick={() => onChange([...rows, { value: "", label: "", source: "" }])}
+        style={{ marginTop: 4 }}
+      >
+        <Icon name="plus" size={13} strokeWidth={2.2} />
+        Add result
+      </button>
+    </div>
+  );
+}
+
+/** Fetch `[value, label]` select options from another collection. */
+function useRemoteOptions(source?: OptionsSource) {
+  const [options, setOptions] = useState<[string, string][]>([]);
+  useEffect(() => {
+    if (!source) return;
+    let alive = true;
+    api
+      .list<Record<string, any>>(source.path, { page_size: 100 })
+      .then((data) => {
+        if (!alive) return;
+        setOptions(
+          (data?.results ?? []).map((r) => [
+            String(r[source.value]),
+            r.is_active === false ? `${r[source.label]} (hidden)` : String(r[source.label]),
+          ]),
+        );
+      })
+      .catch(() => alive && setOptions([]));
+    return () => {
+      alive = false;
+    };
+  }, [source]);
+  return source ? ([["", source.empty], ...options] as [string, string][]) : null;
 }
 
 export function ImageInput({
   currentUrl,
   onFile,
+  onClear,
 }: {
-  currentUrl?: string;
+  currentUrl?: string | null;
   onFile: (file: File | null) => void;
+  /** when given, a "Remove" button clears the image (saved as null) */
+  onClear?: () => void;
 }) {
-  const [preview, setPreview] = useState<string | undefined>(currentUrl);
+  const [preview, setPreview] = useState<string | undefined>(currentUrl ?? undefined);
+  const [inputKey, setInputKey] = useState(0);
+  // the drawer stays mounted between records — follow the record's stored image
+  useEffect(() => {
+    setPreview(currentUrl ?? undefined);
+    setInputKey((k) => k + 1);
+  }, [currentUrl]);
   const box = {
     width: 62,
     height: 62,
@@ -244,17 +371,34 @@ export function ImageInput({
         </div>
       )}
       <div style={{ flex: 1 }}>
-        <input
-          type="file"
-          accept="image/*"
-          className="input"
-          style={{ padding: 7 }}
-          onChange={(e) => {
-            const file = e.target.files?.[0] ?? null;
-            onFile(file);
-            setPreview(file ? URL.createObjectURL(file) : currentUrl);
-          }}
-        />
+        <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+          <input
+            key={inputKey}
+            type="file"
+            accept="image/*"
+            className="input"
+            style={{ padding: 7 }}
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              onFile(file);
+              setPreview(file ? URL.createObjectURL(file) : (currentUrl ?? undefined));
+            }}
+          />
+          {onClear && preview ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ flex: "none" }}
+              onClick={() => {
+                onClear();
+                setPreview(undefined);
+                setInputKey((k) => k + 1);
+              }}
+            >
+              Remove
+            </button>
+          ) : null}
+        </div>
         <div className="hint" style={{ marginTop: 5 }}>
           Uploaded as a separate multipart request once the record saves.
         </div>
@@ -269,11 +413,14 @@ export function SchemaField({
   value,
   onChange,
   onFile,
+  onClear,
 }: {
   def: FieldDef;
   value: any;
   onChange: (v: any) => void;
   onFile: (name: string, file: File | null) => void;
+  /** image fields: clear the stored image */
+  onClear?: (name: string) => void;
 }) {
   if (def.type === "bool") {
     return (
@@ -285,34 +432,42 @@ export function SchemaField({
   if (def.type === "chips") {
     return (
       <Field label={def.label} hint={def.hint} required={def.required}>
-        <ChipsInput value={Array.isArray(value) ? value : []} onChange={onChange} />
+        <ChipsInput value={Array.isArray(value) ? value : []} onChange={onChange} dir={def.dir} />
       </Field>
     );
   }
   if (def.type === "kv") {
     return (
       <Field label={def.label} hint={def.hint}>
-        <KeyValueInput value={value ?? {}} onChange={onChange} />
+        <KeyValueInput value={value ?? {}} onChange={onChange} urlValues={def.urlValues} />
+      </Field>
+    );
+  }
+  if (def.type === "results") {
+    return (
+      <Field label={def.label} hint={def.hint}>
+        <ResultsInput value={value ?? []} onChange={onChange} dir={def.dir} />
       </Field>
     );
   }
   if (def.type === "image") {
     return (
       <Field label={def.label} hint={def.hint}>
-        <ImageInput currentUrl={value} onFile={(f) => onFile(def.name, f)} />
+        <ImageInput
+          currentUrl={value}
+          onFile={(f) => onFile(def.name, f)}
+          onClear={onClear && def.clearable !== false ? () => onClear(def.name) : undefined}
+        />
       </Field>
     );
   }
   if (def.type === "select") {
+    return <SelectField def={def} value={value} onChange={onChange} />;
+  }
+  if (def.type === "markdown") {
     return (
       <Field label={def.label} hint={def.hint} required={def.required}>
-        <select className="input" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
-          {(def.options ?? []).map(([v, l]) => (
-            <option key={v} value={v}>
-              {l}
-            </option>
-          ))}
-        </select>
+        <MarkdownEditor value={value ?? ""} onChange={onChange} dir={def.dir} />
       </Field>
     );
   }
@@ -321,6 +476,7 @@ export function SchemaField({
       <Field label={def.label} hint={def.hint} required={def.required}>
         <textarea
           className="input"
+          dir={def.dir}
           style={def.tall ? { minHeight: 200 } : undefined}
           maxLength={def.maxLength}
           value={value ?? ""}
@@ -334,11 +490,47 @@ export function SchemaField({
       <input
         className="input"
         type={def.type === "number" ? "number" : "text"}
+        dir={def.dir}
         readOnly={def.readOnly}
-        style={def.name === "slug" ? { fontFamily: "var(--font-mono)", fontSize: 12.5 } : undefined}
+        maxLength={def.type === "number" ? undefined : def.maxLength}
+        style={["slug", "old_path", "new_path"].includes(def.name) ? { fontFamily: "var(--font-mono)", fontSize: 12.5 } : undefined}
         value={value ?? ""}
-        onChange={(e) => onChange(def.type === "number" ? Number(e.target.value || 0) : e.target.value)}
+        onChange={(e) =>
+          onChange(
+            def.type === "number"
+              ? e.target.value === ""
+                ? def.nullable
+                  ? null
+                  : 0
+                : Number(e.target.value)
+              : e.target.value,
+          )
+        }
       />
+    </Field>
+  );
+}
+
+function SelectField({ def, value, onChange }: { def: FieldDef; value: any; onChange: (v: any) => void }) {
+  const remote = useRemoteOptions(def.optionsFrom);
+  const options = remote ?? def.options ?? [];
+  const current = value == null ? "" : String(value);
+  // keep an unknown current value selectable (e.g. options still loading)
+  const withCurrent =
+    current && !options.some(([v]) => v === current) ? [...options, [current, current] as [string, string]] : options;
+  return (
+    <Field label={def.label} hint={def.hint} required={def.required}>
+      <select
+        className="input"
+        value={current}
+        onChange={(e) => onChange(def.optionsFrom && e.target.value === "" ? null : e.target.value)}
+      >
+        {withCurrent.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
     </Field>
   );
 }

@@ -3,33 +3,49 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "./ui";
 import { SchemaField } from "./fields";
+import { GalleryManager } from "./GalleryManager";
 import { api, request } from "@/lib/api";
 import type { ResourceDef } from "@/lib/resources";
 import type { AnyRecord } from "@/lib/types";
-import { capitalise, formatDate } from "@/lib/utils";
+import { capitalise, formatDate, invalidUrlKeys } from "@/lib/utils";
 import { useToast } from "@/providers/ToastProvider";
 
 function initialValues(def: ResourceDef, record: AnyRecord | null) {
   const values: Record<string, any> = {};
   for (const field of def.fields) {
     if (!record) {
+      if (field.default !== undefined) {
+        // copy so arrays/objects are never shared between new records
+        values[field.name] =
+          field.default !== null && typeof field.default === "object"
+            ? JSON.parse(JSON.stringify(field.default))
+            : field.default;
+        continue;
+      }
       values[field.name] =
         field.type === "bool"
-          ? field.name === "is_active" || field.name === "published"
-          : field.type === "chips"
+          ? field.name === "is_active"
+          : field.type === "chips" || field.type === "results"
             ? []
             : field.type === "kv"
               ? {}
               : field.type === "number"
-                ? 0
+                ? field.nullable
+                  ? null
+                  : 0
                 : field.type === "select"
-                  ? (field.options?.[0]?.[0] ?? "")
+                  ? field.optionsFrom
+                    ? null
+                    : (field.options?.[0]?.[0] ?? "")
                   : "";
       continue;
     }
     if (field.readFrom) {
-      // tags[] is read-only; tag_slugs[] is what we write back
-      values[field.name] = (record[field.readFrom] ?? []).map((t: any) => t.slug ?? t.name ?? t);
+      // tags[] / services[] are read-only; tag_slugs[] / service_slugs[] are what we write back.
+      // Tags go back as names (the API accepts names or slugs) so they match what editors type.
+      values[field.name] = (record[field.readFrom] ?? []).map((t: any) =>
+        typeof t === "string" ? t : field.name === "tag_slugs" ? (t.name ?? t.slug) : (t.slug ?? t.name),
+      );
     } else {
       values[field.name] = record[field.name];
     }
@@ -53,14 +69,33 @@ export function ResourceEditor({
   const toast = useToast();
   const [values, setValues] = useState<Record<string, any>>({});
   const [files, setFiles] = useState<Record<string, File | null>>({});
+  /** image fields the user removed — saved as null */
+  const [cleared, setCleared] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setValues(initialValues(def, record));
       setFiles({});
+      setCleared({});
     }
   }, [open, def, record]);
+
+  /** Client-side checks mirroring the backend, so obvious mistakes never round-trip. */
+  function validate(): string | null {
+    for (const field of def.fields) {
+      if (field.readOnly) continue;
+      const v = values[field.name];
+      if (field.required && field.type !== "image" && (v == null || (typeof v === "string" && !v.trim()) || (Array.isArray(v) && !v.length))) {
+        return `${field.label} is required.`;
+      }
+      if (field.urlValues) {
+        const bad = invalidUrlKeys(v);
+        if (bad.length) return `${field.label}: "${bad.join('", "')}" must be a full URL starting with http:// or https://.`;
+      }
+    }
+    return null;
+  }
 
   const detailPath = (key: string | undefined) => {
     if (!key) throw new Error(`This ${def.noun} has no ${def.lookup} to address it by.`);
@@ -68,11 +103,22 @@ export function ResourceEditor({
   };
 
   async function save() {
+    const problem = validate();
+    if (problem) {
+      toast(problem, true);
+      return;
+    }
     setSaving(true);
     try {
       const payload: Record<string, any> = {};
       for (const field of def.fields) {
-        if (field.readOnly || field.type === "image") continue;
+        if (field.readOnly) continue;
+        if (field.type === "image") {
+          // a removed image goes out as JSON null (the model fields are null=True);
+          // new files follow in the multipart PATCH below
+          if (cleared[field.name] && !files[field.name]) payload[field.name] = null;
+          continue;
+        }
         payload[field.name] = values[field.name];
       }
 
@@ -140,14 +186,25 @@ export function ResourceEditor({
           def={field}
           value={values[field.name]}
           onChange={(v) => setValues((prev) => ({ ...prev, [field.name]: v }))}
-          onFile={(name, file) => setFiles((prev) => ({ ...prev, [name]: file }))}
+          onFile={(name, file) => {
+            setFiles((prev) => ({ ...prev, [name]: file }));
+            if (file) setCleared((prev) => ({ ...prev, [name]: false }));
+          }}
+          onClear={(name) => {
+            setFiles((prev) => ({ ...prev, [name]: null }));
+            setCleared((prev) => ({ ...prev, [name]: true }));
+          }}
         />
       ))}
 
-      {record?.gallery?.length ? (
-        <div className="hint" style={{ marginBottom: 12 }}>
-          Gallery: {record.gallery.length} image(s), nested under the project — there is no standalone endpoint for them.
-        </div>
+      {def.path === "/api/projects/" ? (
+        record?.slug ? (
+          <GalleryManager slug={record.slug} />
+        ) : (
+          <div className="hint" style={{ marginBottom: 15 }}>
+            Save the project first — the gallery can be managed once it exists.
+          </div>
+        )
       ) : null}
 
       {record ? (

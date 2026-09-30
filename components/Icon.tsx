@@ -77,6 +77,12 @@ const PATHS: Record<string, React.ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
   check: <path d="M20 6L9 17l-5-5" />,
   trash: <path d="M4 7h16M10 7V5h4v2M6 7l1 13h10l1-13" />,
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1.1-1.5 2.2M12 17h.01" />
+    </>
+  ),
   globe: (
     <>
       <circle cx="12" cy="12" r="9" />
