@@ -59,8 +59,8 @@ Sidebar → **Settings**. These values appear across the whole website (header, 
 | Address (Arabic) | `السادس من أكتوبر، الجيزة، مصر` | |
 | Announcement text | `ETQAN means mastery` | The small badge above the homepage headline. **Leave empty to hide it.** Don't repeat the headline here. Keep Arabic words out of English fields. |
 | Announcement text (Arabic) | `صُنع بإتقان` | |
-| Hero subtitle | `ETQAN designs, builds and markets websites, mobile apps and custom business software for companies in Egypt and the Gulf — engineering and marketing under one roof.` | The paragraph under the homepage headline. |
-| Hero subtitle (Arabic) | `في إتقان نصمّم ونطوّر ونسوّق المواقع الإلكترونية وتطبيقات الجوال والأنظمة المخصصة للشركات في مصر والخليج — هندسة وتسويق تحت سقف واحد.` | |
+| Hero subtitle | `ETQAN designs and builds websites, mobile apps and custom business software for companies in Egypt and the Gulf — software products and solutions, from first idea to launch and support.` | The paragraph under the homepage headline. |
+| Hero subtitle (Arabic) | `في إتقان نصمّم ونطوّر المواقع الإلكترونية وتطبيقات الجوال والأنظمة المخصصة للشركات في مصر والخليج — منتجات وحلول برمجية من الفكرة حتى الإطلاق والدعم.` | |
 | Company about | Short "who we are" paragraph (already filled) | Shown in the homepage About section. |
 | Mission / Vision (EN + AR) | **Write in your own words** | Shown on /about. Until you fill them, the site shows a draft. 1–2 sentences each. |
 | Hero title, Values, Stats | Leave as is | **Not shown on the website yet.** Don't put unverified numbers in Stats. |
@@ -83,7 +83,9 @@ Improvements to make when you can:
 
 ## 3. Services
 
-Sidebar → **Services**. Five services exist. **Do not change their slugs.** They are the SEO URLs.
+Sidebar → **Services**. Four services are active. **Do not change their slugs.** They are the SEO URLs.
+
+> **ETQAN sells software products and solutions only — no marketing services.** The old **Digital Marketing** service is switched off (Active = off) and its page redirects to /services. **Don't switch it back on**, and don't add marketing, ads, SEO-for-clients or social-media services.
 
 For each service:
 
@@ -97,7 +99,7 @@ For each service:
 | Meta title / Meta description | See the table below. The site adds ` \| ETQAN` automatically. **Don't type ETQAN in the meta title.** |
 | Social share image | Optional 1200×630 image for WhatsApp/LinkedIn previews. |
 | Canonical URL | **Leave blank.** |
-| Hide from search engines | **Leave off** for all five. |
+| Hide from search engines | **Leave off** for all four. |
 | Active | On. |
 
 **Recommended values:**
@@ -108,7 +110,6 @@ For each service:
 | `mobile-app-development` | Mobile App Development | برمجة تطبيقات الجوال | Mobile App Development Company — iOS & Android | iOS and Android apps from one codebase with React Native and Flutter — design, build, backend and store launch in one team. Discuss your app. |
 | `custom-software-development` | Custom Software Development | تطوير البرمجيات المخصصة | Custom Software Development — Dashboards & Automation | Dashboards, admin panels, ERP/CRM-style systems and integrations that replace spreadsheets and manual work. Book a discovery call. |
 | `ui-ux-design-branding` | UI/UX Design & Branding | تصميم واجهات المستخدم والهوية | UI/UX Design & Branding — Arabic-First Design | Brand identities and product interfaces designed for Arabic and English users, with proper right-to-left layouts. Request a design review. |
-| `digital-marketing` | Digital Marketing | التسويق الرقمي | Digital Marketing — App Launch, SEO & Lead Tracking | Marketing for the products we build: launch plans, SEO and campaigns tracked end to end to leads. Get a marketing audit. |
 
 > Services have no Arabic meta fields. Arabic search results use the Arabic title and short description, so write those carefully.
 
@@ -250,7 +251,6 @@ Suggested questions (answers must be true for ETQAN):
 | Mobile App Development | Do you build for iOS and Android? · React Native or Flutter — which will you use and why? · Do you publish the app to the stores? · What happens after launch? |
 | Custom Software Development | Can you connect to our existing systems (store, accounting, payments)? · Who owns the code? · Can we start small and grow the system? |
 | UI/UX Design & Branding | Do you design in Arabic from the start? · What do we receive at the end (files, design system)? · Can you redesign an existing app? |
-| Digital Marketing | Do you only market products you built? · How do you measure results? · Do you manage ad budgets? |
 | General (no service) | Do you work with clients outside Egypt? · How much does a project cost? · How do we start? |
 
 ---
@@ -367,6 +367,7 @@ Use **WebP or JPG** (PNG only for logos). Keep files **under 500 KB** where poss
 ## 16. Never do this
 
 - ❌ Invent numbers, clients, reviews, awards or testimonials.
+- ❌ Offer or mention marketing services (ads, SEO for clients, social media). ETQAN presents itself as a software products and solutions company only.
 - ❌ Present **team** projects (Tazakka, Hawadeet, DS Mate) as ETQAN client work.
 - ❌ Paste English text into Arabic fields (or the other way round).
 - ❌ Change slugs repeatedly, or reuse an old slug for a different page.
