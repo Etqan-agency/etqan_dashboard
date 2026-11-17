@@ -362,13 +362,39 @@ svg {
   }
   .sel {
     border: 1px solid var(--color-line);
-    background: var(--color-surface);
+    background-color: var(--color-surface);
     border-radius: var(--radius-pill);
     padding: 8px 13px;
     font-size: 12.5px;
     font-weight: 600;
     color: var(--color-muted);
     outline: 0;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .sel:hover {
+    border-color: var(--color-line-strong);
+  }
+  .sel:focus-visible {
+    border-color: var(--color-blue);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  }
+  /* One chevron for every dropdown: the native arrow sits flush against the edge and differs per browser. */
+  select.sel,
+  select.input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234a5c73' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 12px 12px;
+    padding-right: 38px;
+    text-overflow: ellipsis;
+  }
+  select.sel::-ms-expand,
+  select.input::-ms-expand {
+    display: none;
   }
   .chip {
     border: 1px solid var(--color-line);
@@ -434,6 +460,17 @@ svg {
   }
   .row:last-child {
     border-bottom: 0;
+  }
+  .row-main {
+    min-width: 0;
+    flex: 1;
+  }
+  .row-meta {
+    margin-inline-start: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex: none;
   }
   .row-ico {
     width: 33px;
@@ -652,11 +689,39 @@ svg {
   .page {
     padding: 18px 15px 80px;
   }
+  /* Tables scroll sideways inside their card (.table-wrap) instead of squeezing every column to one word per line. */
+  .tbl {
+    min-width: 900px;
+  }
+  .tbl td:first-child {
+    min-width: 220px;
+  }
+  .tbl td:not(:first-child) {
+    white-space: nowrap;
+  }
 }
 @media (max-width: 720px) {
   .grid-4,
   .grid-2 {
     grid-template-columns: 1fr;
+  }
+  /* Inbox rows: text gets the full width, tags and actions wrap onto their own line under it. */
+  .row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .row-meta {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    margin-inline-start: 45px;
+  }
+  /* Filters: two per row, full width, instead of a ragged wrap. The flexible spacer is not needed. */
+  .toolbar > .sel {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+  .toolbar > div:empty {
+    display: none;
   }
   .who-text,
   .searchbox,

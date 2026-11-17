@@ -259,7 +259,7 @@ export default function MessagesPage() {
               <div className="row-ico" style={m.is_read ? undefined : { color: "var(--color-blue)" }}>
                 <Icon name="inbox" size={15} />
               </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="row-main">
                 <div style={{ fontSize: 13.5, fontWeight: 600 }}>{m.subject || m.service_title || "(no subject)"}</div>
                 <div style={{ fontSize: 11.5, color: "var(--color-faint)", marginTop: 2 }}>
                   {m.name} · {primaryContact(m)}
@@ -267,7 +267,7 @@ export default function MessagesPage() {
                   {m.utm_source ? ` · via ${m.utm_source}` : ""}
                 </div>
               </div>
-              <div style={{ marginInlineStart: "auto", display: "flex", gap: 8, alignItems: "center", flex: "none" }}>
+              <div className="row-meta">
                 {m.service_title ? <span className="tag">{m.service_title}</span> : null}
                 {m.budget_range ? <span className="tag">{m.budget_range}</span> : null}
                 <StatusPill status={m.status} label={m.status_display} />
