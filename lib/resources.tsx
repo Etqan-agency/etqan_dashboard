@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Badge, StatusBadge, Thumb } from "@/components/ui";
 import { formatDate, truncate } from "./utils";
+import { t } from "./i18n";
 import type { AnyRecord } from "./types";
 import type { IconName } from "@/components/Icon";
 
@@ -80,8 +81,11 @@ export interface ResourceDef {
 
 const muted = (v: ReactNode) => <span style={{ color: "var(--color-muted)" }}>{v}</span>;
 const faint = (v: ReactNode) => <span style={{ color: "var(--color-faint)", fontSize: 12 }}>{v}</span>;
+/** Paths, slugs, dates and numbers: always laid out left-to-right, even in the Arabic UI. */
 const mono = (v: ReactNode) => (
-  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, letterSpacing: "-0.02em" }}>{v}</span>
+  <span dir="ltr" style={{ fontFamily: "var(--font-mono)", fontSize: 12, letterSpacing: "-0.02em" }}>
+    {v}
+  </span>
 );
 
 const nameWithSub = (main: ReactNode, sub: ReactNode) => (
@@ -165,6 +169,12 @@ const slugField = (maxLength: number): FieldDef => ({
   hint: "Lowercase letters, digits and hyphens. Leave blank to generate from the title. Changing it creates a 301 redirect from the old URL.",
 });
 
+/*
+ * RESOURCES is a module constant: every title / noun / sub / label / hint /
+ * option label below stays in English and is translated with t() where it is
+ * rendered (list page, editor, SchemaField). Only `cell` functions run at
+ * render time, so they call t() themselves. Arabic lives in i18n-ar-screens.ts.
+ */
 export const RESOURCES: Record<string, ResourceDef> = {
   services: {
     path: "/api/services/",
@@ -179,9 +189,9 @@ export const RESOURCES: Record<string, ResourceDef> = {
     columns: [
       { header: "Service", cell: (r) => withThumb(r.image, nameWithSub(r.title, mono(`/${r.slug ?? ""}`))) },
       { header: "Summary", cell: (r) => muted(truncate(r.short_description, 70)) },
-      { header: "Tags", cell: (r) => <span className="tag">{(r.features ?? []).length} listed</span> },
+      { header: "Tags", cell: (r) => <span className="tag">{t("{n} listed", { n: (r.features ?? []).length })}</span> },
       { header: "Order", cell: (r) => mono(r.order ?? 0) },
-      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
+      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel={t("Active")} offLabel={t("Hidden")} /> },
     ],
     fields: [
       ...withAr({ name: "title", label: "Title", type: "text", required: true, maxLength: 150 }),
@@ -194,7 +204,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
         maxLength: 255,
         hint: "Shown on the website under Our Expertise.",
       }),
-      { name: "image", label: "Image", type: "image", hint: "Shown beside the service on the website." },
+      { name: "image", label: "Image", type: "image", hint: "Stored for the service, but the website currently draws its own illustration per service and does not show this image." },
       {
         name: "icon",
         label: "Icon key",
@@ -252,10 +262,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
         header: "Project",
         cell: (r) => withThumb(r.cover_image, nameWithSub(r.title, r.client_name || "—")),
       },
-      { header: "Category", cell: (r) => <Badge tone="blue">{r.category_display ?? r.category ?? "—"}</Badge> },
+      { header: "Category", cell: (r) => <Badge tone="blue">{r.category_display || r.category ? t(r.category_display ?? r.category) : "—"}</Badge> },
       {
         header: "Ownership",
-        cell: (r) => (r.ownership === "team" ? <Badge tone="draft">Team experience</Badge> : faint("ETQAN")),
+        cell: (r) => (r.ownership === "team" ? <Badge tone="draft">{t("Team experience")}</Badge> : faint("ETQAN")),
       },
       {
         header: "Stack",
@@ -264,8 +274,8 @@ export const RESOURCES: Record<string, ResourceDef> = {
           return faint(stack.slice(0, 3).join(" · ") + (stack.length > 3 ? ` +${stack.length - 3}` : ""));
         },
       },
-      { header: "Featured", cell: (r) => (r.is_featured ? <Badge tone="warn">Featured</Badge> : faint("—")) },
-      { header: "Status", cell: (r) => <StatusBadge on={r.published} onLabel="Published" offLabel="Draft" /> },
+      { header: "Featured", cell: (r) => (r.is_featured ? <Badge tone="warn">{t("Featured")}</Badge> : faint("—")) },
+      { header: "Status", cell: (r) => <StatusBadge on={r.published} onLabel={t("Published")} offLabel={t("Draft")} /> },
     ],
     fields: [
       ...withAr({ name: "title", label: "Title", type: "text", required: true, maxLength: 200 }),
@@ -384,10 +394,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
       },
       {
         header: "Author",
-        cell: (r) => (r.author?.slug ? muted(r.author.name) : r.author?.name ? faint(`${r.author.name} (no profile)`) : faint("—")),
+        cell: (r) => (r.author?.slug ? muted(r.author.name) : r.author?.name ? faint(t("{name} (no profile)", { name: r.author.name })) : faint("—")),
       },
       { header: "Published", cell: (r) => (r.published_at ? mono(formatDate(r.published_at)) : faint("—")) },
-      { header: "Status", cell: (r) => <StatusBadge on={r.published} onLabel="Published" offLabel="Draft" /> },
+      { header: "Status", cell: (r) => <StatusBadge on={r.published} onLabel={t("Published")} offLabel={t("Draft")} /> },
     ],
     fields: [
       ...withAr({ name: "title", label: "Title", type: "text", required: true, maxLength: 220 }),
@@ -438,10 +448,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
         header: "Profiles",
         cell: (r) => {
           const links: string[] = r.same_as ?? [];
-          return links.length ? <span className="tag">{links.length} linked</span> : faint("—");
+          return links.length ? <span className="tag">{t("{n} linked", { n: links.length })}</span> : faint("—");
         },
       },
-      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
+      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel={t("Active")} offLabel={t("Hidden")} /> },
     ],
     fields: [
       ...withAr({ name: "name", label: "Display name", type: "text", required: true, maxLength: 150 }),
@@ -483,7 +493,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
       { header: "Author", cell: (r) => withThumb(r.avatar, nameWithSub(r.author_name, r.author_role), true) },
       { header: "Quote", cell: (r) => muted(truncate(r.quote, 90)) },
       { header: "Order", cell: (r) => mono(r.order ?? 0) },
-      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
+      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel={t("Active")} offLabel={t("Hidden")} /> },
     ],
     fields: [
       ...withAr({ name: "quote", label: "Quote", type: "textarea", required: true }),
@@ -525,7 +535,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
         },
       },
       { header: "Order", cell: (r) => mono(r.order ?? 0) },
-      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
+      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel={t("Active")} offLabel={t("Hidden")} /> },
     ],
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
@@ -549,7 +559,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
     lookup: "id",
     title: "Clients",
     noun: "client",
-    sub: "Logos for the client strip.",
+    sub: "Client logos. Note: the website's logo strip currently shows a fixed technology list, so these are not shown on the site yet.",
     icon: "badge",
     ordering: ["order", "name", "created_at"],
     defaultOrder: "order",
@@ -558,7 +568,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
       { header: "Client", cell: (r) => withThumb(r.logo, <span style={{ fontWeight: 600 }}>{r.name}</span>) },
       { header: "Website", cell: (r) => (r.website ? mono(truncate(r.website, 40)) : faint("—")) },
       { header: "Order", cell: (r) => mono(r.order ?? 0) },
-      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
+      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel={t("Active")} offLabel={t("Hidden")} /> },
     ],
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
@@ -591,9 +601,9 @@ export const RESOURCES: Record<string, ResourceDef> = {
     ],
     columns: [
       { header: "Question", cell: (r) => nameWithSub(truncate(r.question, 80), truncate(r.answer, 90)) },
-      { header: "Service", cell: (r) => (r.service ? mono(r.service) : faint("General")) },
+      { header: "Service", cell: (r) => (r.service ? mono(r.service) : faint(t("General"))) },
       { header: "Order", cell: (r) => mono(r.order ?? 0) },
-      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel="Active" offLabel="Hidden" /> },
+      { header: "Status", cell: (r) => <StatusBadge on={r.is_active} onLabel={t("Active")} offLabel={t("Hidden")} /> },
     ],
     fields: [
       ...withAr({ name: "question", label: "Question", type: "text", required: true, maxLength: 300 }),

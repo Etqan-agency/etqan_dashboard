@@ -1,3 +1,4 @@
+import { fieldLabel, getLang, t } from "./i18n";
 import { mockRequest } from "./mock";
 import type { Paginated, TokenPair, User } from "./types";
 
@@ -8,7 +9,10 @@ export const USE_MOCK = API_BASE === "";
 const ACCESS_KEY = "etqan.access";
 const REFRESH_KEY = "etqan.refresh";
 
-class ApiError extends Error {
+/** Fired when the session can no longer be refreshed; AuthProvider sends the user to /login. */
+export const SESSION_EXPIRED_EVENT = "etqan:session-expired";
+
+export class ApiError extends Error {
   status: number;
   data: any;
   constructor(message: string, status: number, data: any) {
@@ -53,13 +57,17 @@ export const tokens = {
   },
 };
 
-/** Flatten a DRF error body into one readable line. */
+/** Flatten a DRF error body into one readable, translated line. */
 export function formatError(data: any): string {
   if (!data) return "";
-  if (typeof data === "string") return data;
-  if (data.detail) return String(data.detail);
+  if (typeof data === "string") return t(data);
+  if (data.detail) return t(String(data.detail));
   return Object.entries(data)
-    .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`)
+    .map(([field, msgs]) => {
+      const text = (Array.isArray(msgs) ? msgs : [msgs]).map((m) => t(String(m))).join(", ");
+      const label = fieldLabel(field);
+      return label ? `${label}: ${text}` : text;
+    })
     .join(" · ");
 }
 
@@ -78,24 +86,52 @@ interface RequestOptions {
   body?: any;
 }
 
-async function refreshAccessToken(): Promise<boolean> {
+/**
+ * One refresh at a time. Refresh tokens rotate and the old one is blacklisted,
+ * so parallel 401s must share a single refresh instead of each spending the
+ * same token (all but the first would fail).
+ */
+type RefreshResult = "ok" | "rejected" | "error";
+let refreshing: Promise<RefreshResult> | null = null;
+
+function refreshAccessToken(): Promise<RefreshResult> {
+  if (!refreshing) {
+    refreshing = doRefresh().finally(() => {
+      refreshing = null;
+    });
+  }
+  return refreshing;
+}
+
+/**
+ * "rejected" only when the server refused the refresh token we still hold;
+ * a network blip, a 5xx or a 429 is "error" and must not sign the user out.
+ */
+async function doRefresh(): Promise<RefreshResult> {
   const refresh = tokens.refresh;
-  if (!refresh) return false;
+  if (!refresh) return "rejected";
   try {
     const res = await fetch(`${API_BASE}/api/auth/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh }),
     });
-    if (!res.ok) return false;
-    const data = await res.json();
-    // rotation is enabled server-side, so store the new refresh too
-    tokens.set({ access: data.access, refresh: data.refresh ?? refresh });
-    return true;
+    if (res.ok) {
+      const data = await res.json();
+      // rotation is enabled server-side, so store the new refresh too
+      tokens.set({ access: data.access, refresh: data.refresh ?? refresh });
+      return "ok";
+    }
+    // Another tab rotated the token meanwhile (shared localStorage): use its result.
+    if (tokens.refresh && tokens.refresh !== refresh) return "ok";
+    return res.status === 401 || res.status === 400 ? "rejected" : "error";
   } catch {
-    return false;
+    return tokens.refresh && tokens.refresh !== refresh ? "ok" : "error";
   }
 }
+
+/** Auth calls whose 401 is a real answer (wrong password, dead token), never retried. */
+const NO_REFRESH_PATHS = ["/api/auth/login/", "/api/auth/refresh/", "/api/auth/logout/", "/api/auth/register/", "/api/auth/social"];
 
 export async function request<T = any>(
   path: string,
@@ -104,7 +140,7 @@ export async function request<T = any>(
 ): Promise<T> {
   if (USE_MOCK) return mockRequest(path, { method: opts.method || "GET", body: opts.body }) as Promise<T>;
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { "Accept-Language": getLang() };
   const access = tokens.access;
   if (access) headers.Authorization = `Bearer ${access}`;
 
@@ -116,8 +152,16 @@ export async function request<T = any>(
 
   const res = await fetch(`${API_BASE}${path}`, { method: opts.method || "GET", headers, body });
 
-  if (res.status === 401 && allowRetry && tokens.refresh) {
-    if (await refreshAccessToken()) return request<T>(path, opts, false);
+  // Refresh once and retry on an expired access token (including /api/auth/me/), but never for the
+  // credential endpoints themselves: a wrong password is a real 401.
+  if (res.status === 401 && allowRetry && tokens.refresh && !NO_REFRESH_PATHS.some((p) => path.startsWith(p))) {
+    const result = await refreshAccessToken();
+    if (result === "ok") return request<T>(path, opts, false);
+    if (result === "rejected") {
+      tokens.clear();
+      if (typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
+    // "error": keep the session; the caller sees this 401 and can retry later.
   }
   if (res.status === 204 || res.status === 205) return null as T;
 
@@ -128,6 +172,7 @@ export async function request<T = any>(
   } catch {
     data = { detail: text };
   }
+  if (res.status === 429) throw new ApiError(t("Too many attempts. Wait a few minutes and try again."), 429, data);
   if (!res.ok) throw new ApiError(formatError(data) || `HTTP ${res.status}`, res.status, data);
   return data as T;
 }

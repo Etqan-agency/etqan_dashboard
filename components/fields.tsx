@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import type { FieldDef, OptionsSource } from "@/lib/resources";
 import type { ProjectResult } from "@/lib/types";
 import { isHttpUrl } from "@/lib/utils";
+import { isRtl, t } from "@/lib/i18n";
 
 export function Field({ label, hint, required, children }: { label?: string; hint?: string; required?: boolean; children: ReactNode }) {
   return (
@@ -50,7 +51,7 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) =
           borderRadius: "50%",
           background: "#fff",
           boxShadow: "var(--shadow-e1)",
-          transform: on ? "translateX(18px)" : "none",
+          transform: on ? (isRtl() ? "translateX(-18px)" : "translateX(18px)") : "none",
           transition: "transform 220ms var(--ease-brand)",
         }}
       />
@@ -119,7 +120,9 @@ export function ChipsInput({
             background: "var(--color-surface-2)",
             border: "1px solid var(--color-line)",
             borderRadius: "var(--radius-pill)",
-            padding: "4px 6px 4px 11px",
+            paddingBlock: 4,
+            paddingInlineStart: 11,
+            paddingInlineEnd: 6,
             fontSize: 12,
             fontWeight: 600,
           }}
@@ -127,7 +130,7 @@ export function ChipsInput({
           {v}
           <button
             type="button"
-            aria-label={`Remove ${v}`}
+            aria-label={t("Remove {item}", { item: v })}
             onClick={() => onChange(value.filter((_, j) => j !== i))}
             style={{ width: 16, height: 16, borderRadius: "50%", display: "grid", placeItems: "center", color: "var(--color-faint)" }}
           >
@@ -147,7 +150,7 @@ export function ChipsInput({
             onChange(value.slice(0, -1));
           }
         }}
-        placeholder="Type and press Enter"
+        placeholder={t("Type and press Enter")}
         style={{ border: 0, outline: 0, flex: 1, minWidth: 120, fontSize: 13, padding: 4, background: "transparent" }}
       />
     </div>
@@ -182,9 +185,10 @@ export function KeyValueInput({
         <div key={i} style={{ display: "flex", gap: 7, marginBottom: 7 }}>
           <input
             className="input"
+            dir="ltr"
             style={{ maxWidth: 170, fontFamily: "var(--font-mono)", fontSize: 12 }}
             value={k}
-            placeholder={keyPlaceholder}
+            placeholder={t(keyPlaceholder)}
             onChange={(e) => {
               const next = [...rows];
               next[i] = [e.target.value, v];
@@ -193,8 +197,9 @@ export function KeyValueInput({
           />
           <input
             className="input"
+            dir="ltr"
             value={v}
-            placeholder={urlValues ? "https://…" : "value"}
+            placeholder={urlValues ? "https://…" : t("value")}
             aria-invalid={urlValues && k.trim() !== "" && !isHttpUrl(v) ? true : undefined}
             style={urlValues && k.trim() !== "" && !isHttpUrl(v) ? { borderColor: "var(--color-clay)" } : undefined}
             onChange={(e) => {
@@ -205,7 +210,7 @@ export function KeyValueInput({
           />
           <button
             type="button"
-            aria-label="Remove pair"
+            aria-label={t("Remove pair")}
             onClick={() => update(rows.filter((_, j) => j !== i))}
             style={{
               width: 38,
@@ -229,11 +234,11 @@ export function KeyValueInput({
         style={{ marginTop: 4 }}
       >
         <Icon name="plus" size={13} strokeWidth={2.2} />
-        Add pair
+        {t("Add pair")}
       </button>
       {urlValues && rows.some(([k, v]) => k.trim() && !isHttpUrl(v)) ? (
         <div className="hint" style={{ color: "var(--color-clay)", marginTop: 6 }}>
-          Values must be full URLs starting with http:// or https://.
+          {t("Values must be full URLs starting with http:// or https://.")}
         </div>
       ) : null}
     </div>
@@ -269,18 +274,18 @@ export function ResultsInput({
           <input
             className="input"
             value={r.label ?? ""}
-            placeholder="label"
+            placeholder={t("label")}
             onChange={(e) => set(i, "label", e.target.value)}
           />
           <input
             className="input"
             value={r.source ?? ""}
-            placeholder="source"
+            placeholder={t("source")}
             onChange={(e) => set(i, "source", e.target.value)}
           />
           <button
             type="button"
-            aria-label="Remove result"
+            aria-label={t("Remove result")}
             onClick={() => onChange(rows.filter((_, j) => j !== i))}
             style={{
               width: 38,
@@ -304,7 +309,7 @@ export function ResultsInput({
         style={{ marginTop: 4 }}
       >
         <Icon name="plus" size={13} strokeWidth={2.2} />
-        Add result
+        {t("Add result")}
       </button>
     </div>
   );
@@ -323,7 +328,7 @@ function useRemoteOptions(source?: OptionsSource) {
         setOptions(
           (data?.results ?? []).map((r) => [
             String(r[source.value]),
-            r.is_active === false ? `${r[source.label]} (hidden)` : String(r[source.label]),
+            r.is_active === false ? t("{label} (hidden)", { label: String(r[source.label]) }) : String(r[source.label]),
           ]),
         );
       })
@@ -332,7 +337,7 @@ function useRemoteOptions(source?: OptionsSource) {
       alive = false;
     };
   }, [source]);
-  return source ? ([["", source.empty], ...options] as [string, string][]) : null;
+  return source ? ([["", t(source.empty)], ...options] as [string, string][]) : null;
 }
 
 export function ImageInput({
@@ -395,12 +400,12 @@ export function ImageInput({
                 setInputKey((k) => k + 1);
               }}
             >
-              Remove
+              {t("Remove")}
             </button>
           ) : null}
         </div>
         <div className="hint" style={{ marginTop: 5 }}>
-          Uploaded as a separate multipart request once the record saves.
+          {t("Uploaded as a separate multipart request once the record saves.")}
         </div>
       </div>
     </div>
@@ -422,37 +427,41 @@ export function SchemaField({
   /** image fields: clear the stored image */
   onClear?: (name: string) => void;
 }) {
+  const label = t(def.label);
+  const hint = def.hint ? t(def.hint) : undefined;
+  /** content inputs keep their own direction: Arabic twins are rtl, everything else ltr */
+  const dir = def.dir ?? "ltr";
   if (def.type === "bool") {
     return (
       <div style={{ marginBottom: 15 }}>
-        <ToggleRow label={def.label} hint={def.hint} on={Boolean(value)} onChange={onChange} />
+        <ToggleRow label={label} hint={hint} on={Boolean(value)} onChange={onChange} />
       </div>
     );
   }
   if (def.type === "chips") {
     return (
-      <Field label={def.label} hint={def.hint} required={def.required}>
-        <ChipsInput value={Array.isArray(value) ? value : []} onChange={onChange} dir={def.dir} />
+      <Field label={label} hint={hint} required={def.required}>
+        <ChipsInput value={Array.isArray(value) ? value : []} onChange={onChange} dir={dir} />
       </Field>
     );
   }
   if (def.type === "kv") {
     return (
-      <Field label={def.label} hint={def.hint}>
+      <Field label={label} hint={hint}>
         <KeyValueInput value={value ?? {}} onChange={onChange} urlValues={def.urlValues} />
       </Field>
     );
   }
   if (def.type === "results") {
     return (
-      <Field label={def.label} hint={def.hint}>
-        <ResultsInput value={value ?? []} onChange={onChange} dir={def.dir} />
+      <Field label={label} hint={hint}>
+        <ResultsInput value={value ?? []} onChange={onChange} dir={dir} />
       </Field>
     );
   }
   if (def.type === "image") {
     return (
-      <Field label={def.label} hint={def.hint}>
+      <Field label={label} hint={hint}>
         <ImageInput
           currentUrl={value}
           onFile={(f) => onFile(def.name, f)}
@@ -466,17 +475,17 @@ export function SchemaField({
   }
   if (def.type === "markdown") {
     return (
-      <Field label={def.label} hint={def.hint} required={def.required}>
-        <MarkdownEditor value={value ?? ""} onChange={onChange} dir={def.dir} />
+      <Field label={label} hint={hint} required={def.required}>
+        <MarkdownEditor value={value ?? ""} onChange={onChange} dir={dir} />
       </Field>
     );
   }
   if (def.type === "textarea") {
     return (
-      <Field label={def.label} hint={def.hint} required={def.required}>
+      <Field label={label} hint={hint} required={def.required}>
         <textarea
           className="input"
-          dir={def.dir}
+          dir={dir}
           style={def.tall ? { minHeight: 200 } : undefined}
           maxLength={def.maxLength}
           value={value ?? ""}
@@ -486,11 +495,11 @@ export function SchemaField({
     );
   }
   return (
-    <Field label={def.label} hint={def.hint} required={def.required}>
+    <Field label={label} hint={hint} required={def.required}>
       <input
         className="input"
         type={def.type === "number" ? "number" : "text"}
-        dir={def.dir}
+        dir={def.type === "number" ? def.dir : dir}
         readOnly={def.readOnly}
         maxLength={def.type === "number" ? undefined : def.maxLength}
         style={["slug", "old_path", "new_path"].includes(def.name) ? { fontFamily: "var(--font-mono)", fontSize: 12.5 } : undefined}
@@ -512,14 +521,15 @@ export function SchemaField({
 }
 
 function SelectField({ def, value, onChange }: { def: FieldDef; value: any; onChange: (v: any) => void }) {
+  // remote options are record names (data); static options are UI labels
   const remote = useRemoteOptions(def.optionsFrom);
-  const options = remote ?? def.options ?? [];
+  const options = remote ?? (def.options ?? []).map(([v, l]) => [v, t(l)] as [string, string]);
   const current = value == null ? "" : String(value);
   // keep an unknown current value selectable (e.g. options still loading)
   const withCurrent =
     current && !options.some(([v]) => v === current) ? [...options, [current, current] as [string, string]] : options;
   return (
-    <Field label={def.label} hint={def.hint} required={def.required}>
+    <Field label={t(def.label)} hint={def.hint ? t(def.hint) : undefined} required={def.required}>
       <select
         className="input"
         value={current}

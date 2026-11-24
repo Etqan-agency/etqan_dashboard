@@ -102,6 +102,40 @@ const PATHS: Record<string, React.ReactNode> = {
     </>
   ),
   code: <path d="M9 18l-6-6 6-6M15 6l6 6-6 6" />,
+  eye: (
+    <>
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 5.1A10.6 10.6 0 0112 5c6.4 0 10 7 10 7a17.6 17.6 0 01-3.2 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.9 9.9 0 005.4-1.6" />
+      <path d="M9.9 9.9a3 3 0 004.2 4.2" />
+    </>
+  ),
+  shield: <path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z" />,
+  send: <path d="M21 3L10 14M21 3l-7 18-4-7-7-4 18-7z" />,
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  history: (
+    <>
+      <path d="M3 12a9 9 0 103-6.7L3 8" />
+      <path d="M3 3v5h5M12 7v5l3 2" />
+    </>
+  ),
+  text: <path d="M4 6h16M4 12h10M4 18h13" />,
+  key: (
+    <>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2" />
+    </>
+  ),
   image: (
     <>
       <rect x="3" y="4" width="18" height="16" rx="3" />

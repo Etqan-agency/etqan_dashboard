@@ -7,16 +7,18 @@
    (bg-ink, text-muted, rounded-lg, shadow-e2, …).
    ============================================================ */
 @theme {
-  /* Brand */
-  --color-ink: #0a1a2f;
-  --color-ink-2: #16283f;
-  --color-blue: #2563eb;
-  --color-blue-strong: #1d4ed8;
-  --color-blue-tint: #dce8fd;
-  --color-sky: #bfd8f5;
+  /* Brand — ETQAN identity (same palette as the public site: navy, primary blue, sky accent) */
+  --color-ink: #151934;
+  --color-ink-2: #222849;
+  --color-blue: #034c88;
+  --color-blue-strong: #023a69;
+  --color-blue-tint: #e0ecf7;
+  --color-sky: #cdebf6;
+  --color-accent: #4dc1e3;
+  --color-accent-strong: #1580a8;
 
   /* Neutral */
-  --color-paper: #f4f6f9;
+  --color-paper: #f6f8fb;
   --color-surface: #ffffff;
   --color-surface-2: #f8fafc;
   --color-line: #e4e9f0;
@@ -34,7 +36,8 @@
   --color-amber-tint: #faeee0;
 
   /* Type */
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+  /* Readex Pro: ETQAN's brand typeface, with full Arabic support */
+  --font-sans: "Readex Pro", ui-sans-serif, -apple-system, "Segoe UI", Tahoma, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 
   /* Radius */
@@ -72,12 +75,15 @@ body {
   -webkit-font-smoothing: antialiased;
   font-variant-numeric: tabular-nums;
 }
-button {
-  background: none;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
+/* In the base layer so component classes (.btn-primary, .btn-blue…) can set their own colours. */
+@layer base {
+  button {
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
 }
 svg {
   display: block;
@@ -881,4 +887,170 @@ svg {
   border-top: 1px solid var(--color-line);
   font-size: 11.5px;
   color: var(--color-faint);
+}
+
+
+/* ============================================================
+   ETQAN IDENTITY, RTL AND NEW SCREENS
+   ============================================================ */
+:root {
+  --brand-gradient: linear-gradient(120deg, var(--color-blue) 0%, var(--color-accent) 100%);
+  --login-bg: radial-gradient(1200px 600px at 85% -10%, rgba(77, 193, 227, 0.22), transparent 60%),
+    linear-gradient(170deg, #e6f1fa, var(--color-paper) 46%);
+}
+
+/* Arabic: no negative tracking (it breaks joined letters), slightly taller lines */
+[dir="rtl"] body {
+  line-height: 1.65;
+}
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] .nav-item,
+[dir="rtl"] .btn {
+  letter-spacing: 0 !important;
+}
+
+/* Directional icons (arrows, chevrons, send, sign-out) point the other way in RTL */
+[dir="rtl"] .flip-rtl,
+[dir="rtl"] .btn-primary .arrow svg {
+  transform: scaleX(-1);
+}
+[dir="rtl"] .btn-primary:hover .arrow {
+  transform: translateX(-3px);
+}
+
+/* Selects: chevron on the inline-end side in both directions */
+[dir="rtl"] .sel,
+[dir="rtl"] select.input {
+  background-position: left 14px center;
+  padding-right: 13px;
+  padding-left: 38px;
+}
+
+/* Mobile sidebar slides in from the right in RTL */
+@media (max-width: 980px) {
+  [dir="rtl"] .side {
+    transform: translateX(100%);
+  }
+  [dir="rtl"] .side[data-open="true"] {
+    transform: none;
+  }
+}
+
+/* Primary actions use the brand gradient accent on the arrow chip */
+.btn-primary .arrow {
+  background: var(--brand-gradient);
+}
+.nav-item[data-active="true"] {
+  background: var(--color-ink);
+  color: #fff;
+}
+
+/* Password show/hide */
+.pw-toggle {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 6px;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  color: var(--color-faint);
+}
+.pw-toggle:hover {
+  color: var(--color-body);
+  background: var(--color-surface-2);
+}
+
+.lang-toggle span {
+  font-weight: 600;
+}
+
+/* Editorial workflow panel */
+.workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  margin-bottom: 18px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.workflow-note {
+  background: var(--color-amber-tint);
+  color: var(--color-amber);
+  border-radius: var(--radius-md);
+  padding: 10px 13px;
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+.workflow .workflow-note {
+  margin-bottom: 0;
+}
+.history ol {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+  display: grid;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.history-note {
+  margin-top: 4px;
+  padding: 7px 10px;
+  border-inline-start: 3px solid var(--color-accent);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+}
+
+/* Website texts editor */
+.copy-list {
+  display: flex;
+  flex-direction: column;
+}
+.copy-row {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--color-line);
+}
+.copy-key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.copy-key code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-faint);
+  font-weight: 400;
+  margin-inline-start: auto;
+}
+.copy-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.copy-fields > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+@media (max-width: 760px) {
+  .copy-fields {
+    grid-template-columns: 1fr;
+  }
+}
+fieldset:disabled .input,
+fieldset:disabled select {
+  background: var(--color-surface-2);
+  cursor: not-allowed;
 }

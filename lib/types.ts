@@ -14,7 +14,55 @@ export interface User {
   name?: string;
   is_staff?: boolean;
   is_admin?: boolean;
+  /** dashboard role (null = no dashboard access) */
+  role?: string | null;
+  /** capabilities granted by the role, e.g. "content", "blog.publish" */
+  capabilities?: string[];
   date_joined?: string;
+}
+
+/** A dashboard account as managed under /api/users/. */
+export interface ManagedUser {
+  id: string;
+  email: string;
+  username: string | null;
+  name: string;
+  role: string;
+  effective_role: string;
+  is_active: boolean;
+  has_author_profile?: boolean;
+  date_joined?: string;
+  last_login?: string | null;
+}
+
+export type PostStatus = "draft" | "in_review" | "changes_requested" | "approved" | "published";
+
+export interface PostPermissions {
+  edit: boolean;
+  delete: boolean;
+  submit: boolean;
+  request_changes: boolean;
+  approve: boolean;
+  publish: boolean;
+  unpublish: boolean;
+  comment: boolean;
+}
+
+export interface PostEvent {
+  id: string;
+  action: string;
+  note: string;
+  from_status: string;
+  to_status: string;
+  actor: string | null;
+  created_at: string;
+}
+
+export interface PostRevision {
+  id: string;
+  editor: string | null;
+  created_at: string;
+  snapshot: Record<string, string>;
 }
 
 export interface TokenPair {
@@ -161,6 +209,12 @@ export interface Post extends Timestamped, SeoFields {
   author_profile?: string | null;
   published: boolean;
   published_at: string | null;
+  /** editorial workflow (dashboard users only) */
+  status?: PostStatus;
+  review_note?: string;
+  is_scheduled?: boolean;
+  owner?: { id: string; name: string } | null;
+  permissions?: PostPermissions;
   title_ar: string;
   excerpt_ar: string;
   body_ar: string;

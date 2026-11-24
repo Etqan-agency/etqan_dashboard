@@ -5,6 +5,7 @@ import { Icon } from "./Icon";
 import { api, request } from "@/lib/api";
 import type { ProjectImage } from "@/lib/types";
 import { useToast } from "@/providers/ToastProvider";
+import { t } from "@/lib/i18n";
 
 const sortImages = (rows: ProjectImage[]) => [...rows].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
@@ -49,7 +50,7 @@ export function GalleryManager({ slug }: { slug: string }) {
     try {
       apply(asArray(await api.get(listPath)));
     } catch (err: any) {
-      setError(err.message ?? "Could not load the gallery.");
+      setError(err.message ?? t("Could not load the gallery."));
     } finally {
       setLoading(false);
     }
@@ -73,9 +74,9 @@ export function GalleryManager({ slug }: { slug: string }) {
         await request(listPath, { method: "POST", body: form });
         done++;
       }
-      toast(`Uploaded ${done} image${done === 1 ? "" : "s"}.`);
+      toast(t(done === 1 ? "Uploaded 1 image." : "Uploaded {n} images.", { n: done }));
     } catch (err: any) {
-      toast(`${done ? `Uploaded ${done}, then failed: ` : ""}${err.message ?? "Upload failed."}`, true);
+      toast(`${done ? t("Uploaded {n}, then failed: ", { n: done }) : ""}${err.message ?? t("Upload failed.")}`, true);
     } finally {
       if (fileRef.current) fileRef.current.value = "";
       setBusy(false);
@@ -93,9 +94,9 @@ export function GalleryManager({ slug }: { slug: string }) {
     try {
       const saved = await api.patch<ProjectImage>(itemPath(img.id), changes);
       setImages((rows) => rows.map((r) => (r.id === img.id ? { ...r, ...changes, ...(saved ?? {}) } : r)));
-      toast("Caption saved.");
+      toast(t("Caption saved."));
     } catch (err: any) {
-      toast(err.message ?? "Could not save the caption.", true);
+      toast(err.message ?? t("Could not save the caption."), true);
     }
   }
 
@@ -112,7 +113,7 @@ export function GalleryManager({ slug }: { slug: string }) {
     try {
       await Promise.all(changed.map((img) => api.patch(itemPath(img.id), { order: img.order })));
     } catch (err: any) {
-      toast(err.message ?? "Could not reorder the gallery.", true);
+      toast(err.message ?? t("Could not reorder the gallery."), true);
       load();
     } finally {
       setBusy(false);
@@ -120,13 +121,13 @@ export function GalleryManager({ slug }: { slug: string }) {
   }
 
   async function remove(img: ProjectImage) {
-    if (!window.confirm("Delete this gallery image? This cannot be undone.")) return;
+    if (!window.confirm(t("Delete this gallery image? This cannot be undone."))) return;
     try {
       await api.remove(itemPath(img.id));
       setImages((rows) => rows.filter((r) => r.id !== img.id));
-      toast("Image deleted.");
+      toast(t("Image deleted."));
     } catch (err: any) {
-      toast(err.message ?? "Could not delete the image.", true);
+      toast(err.message ?? t("Could not delete the image."), true);
     }
   }
 
@@ -137,9 +138,9 @@ export function GalleryManager({ slug }: { slug: string }) {
     <div style={{ marginBottom: 15 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <label className="field-label" style={{ margin: 0 }}>
-          Gallery
+          {t("Gallery")}
         </label>
-        <span className="hint">{images.length ? `${images.length} image${images.length === 1 ? "" : "s"}` : ""}</span>
+        <span className="hint">{images.length ? t(images.length === 1 ? "1 image" : "{n} images", { n: images.length }) : ""}</span>
         <button
           type="button"
           className="btn btn-ghost btn-sm"
@@ -148,7 +149,7 @@ export function GalleryManager({ slug }: { slug: string }) {
           onClick={() => fileRef.current?.click()}
         >
           <Icon name="plus" size={13} strokeWidth={2.2} />
-          {busy ? "Working…" : "Upload images"}
+          {busy ? t("Working…") : t("Upload images")}
         </button>
         <input
           ref={fileRef}
@@ -166,11 +167,11 @@ export function GalleryManager({ slug }: { slug: string }) {
         <div className="hint" style={{ color: "var(--color-clay)" }}>
           {error}{" "}
           <button type="button" className="btn btn-ghost btn-sm" onClick={load}>
-            Retry
+            {t("Retry")}
           </button>
         </div>
       ) : images.length === 0 ? (
-        <div className="hint">No gallery images yet. Upload screenshots to show them on the case study.</div>
+        <div className="hint">{t("No gallery images yet. Upload screenshots to show them on the case study.")}</div>
       ) : (
         images.map((img, i) => (
           <div
@@ -220,7 +221,8 @@ export function GalleryManager({ slug }: { slug: string }) {
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
               <input
                 className="input"
-                placeholder="Caption"
+                dir="ltr"
+                placeholder={t("Caption")}
                 maxLength={200}
                 value={drafts[img.id]?.caption ?? ""}
                 onChange={(e) => setDraft(img.id, "caption", e.target.value)}
@@ -229,14 +231,14 @@ export function GalleryManager({ slug }: { slug: string }) {
               <input
                 className="input"
                 dir="rtl"
-                placeholder="التعليق (Arabic caption)"
+                placeholder={t("Caption (Arabic)")}
                 maxLength={200}
                 value={drafts[img.id]?.caption_ar ?? ""}
                 onChange={(e) => setDraft(img.id, "caption_ar", e.target.value)}
                 onBlur={() => saveCaption(img)}
               />
               {img.width && img.height ? (
-                <span className="hint">
+                <span className="hint" dir="ltr">
                   {img.width}×{img.height}px
                 </span>
               ) : null}
@@ -244,7 +246,7 @@ export function GalleryManager({ slug }: { slug: string }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <button
                 type="button"
-                aria-label="Move up"
+                aria-label={t("Move up")}
                 style={iconBtn}
                 disabled={busy || i === 0}
                 onClick={() => move(i, -1)}
@@ -253,21 +255,21 @@ export function GalleryManager({ slug }: { slug: string }) {
               </button>
               <button
                 type="button"
-                aria-label="Move down"
+                aria-label={t("Move down")}
                 style={iconBtn}
                 disabled={busy || i === images.length - 1}
                 onClick={() => move(i, 1)}
               >
                 <Icon name="chevron" size={13} style={{ transform: "rotate(90deg)" }} />
               </button>
-              <button type="button" aria-label="Delete image" style={iconBtn} onClick={() => remove(img)}>
+              <button type="button" aria-label={t("Delete image")} style={iconBtn} onClick={() => remove(img)}>
                 <Icon name="trash" size={13} />
               </button>
             </div>
           </div>
         ))
       )}
-      <span className="hint">Changes here save immediately. Captions save when you leave the box.</span>
+      <span className="hint">{t("Changes here save immediately. Captions save when you leave the box.")}</span>
     </div>
   );
 }

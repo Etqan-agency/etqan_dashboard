@@ -3,26 +3,34 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./Icon";
+import { BrandLockup, LanguageToggle } from "./Brand";
 import { API_BASE, USE_MOCK } from "@/lib/api";
+import { t } from "@/lib/i18n";
+import { canOpen } from "@/lib/roles";
 import { useAuth } from "@/providers/AuthProvider";
 
-const CONTENT: { href: string; label: string; icon: IconName }[] = [
+type NavItem = { href: string; label: string; icon: IconName };
+
+const CONTENT: NavItem[] = [
   { href: "/overview", label: "Overview", icon: "grid" },
+  { href: "/blog", label: "Blog", icon: "pen" },
   { href: "/services", label: "Services", icon: "spark" },
   { href: "/projects", label: "Portfolio", icon: "layers" },
-  { href: "/blog", label: "Blog", icon: "pen" },
   { href: "/authors", label: "Authors", icon: "users" },
   { href: "/opinions", label: "Testimonials", icon: "quote" },
   { href: "/team", label: "Team", icon: "users" },
   { href: "/clients", label: "Clients", icon: "badge" },
   { href: "/faqs", label: "FAQs", icon: "help" },
+];
+
+const SITE: NavItem[] = [
+  { href: "/site-texts", label: "Website texts", icon: "text" },
+  { href: "/messages", label: "Inbox", icon: "inbox" },
+  { href: "/settings", label: "Site settings", icon: "cog" },
   { href: "/redirects", label: "Redirects", icon: "arrow" },
 ];
 
-const SITE: { href: string; label: string; icon: IconName }[] = [
-  { href: "/messages", label: "Inbox", icon: "inbox" },
-  { href: "/settings", label: "Site settings", icon: "cog" },
-];
+const ADMIN: NavItem[] = [{ href: "/users", label: "Users", icon: "shield" }];
 
 export function Sidebar({
   open,
@@ -34,14 +42,14 @@ export function Sidebar({
   unread: number;
 }) {
   const pathname = usePathname();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
-  const item = ({ href, label, icon }: { href: string; label: string; icon: IconName }) => {
+  const item = ({ href, label, icon }: NavItem) => {
     const active = pathname === href;
     return (
       <Link key={href} href={href} className="nav-item" data-active={active} onClick={onClose}>
         <Icon name={icon} size={18} style={{ opacity: active ? 1 : 0.8, flex: "none" }} />
-        <span>{label}</span>
+        <span>{t(label)}</span>
         {href === "/messages" && unread > 0 ? (
           <span
             style={{
@@ -62,7 +70,7 @@ export function Sidebar({
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "var(--color-blue)",
+              background: "var(--color-accent)",
               marginInlineStart: "auto",
               opacity: active ? 1 : 0,
               flex: "none",
@@ -70,6 +78,19 @@ export function Sidebar({
           />
         )}
       </Link>
+    );
+  };
+
+  const group = (label: string, items: NavItem[], first = false) => {
+    const visible = items.filter((i) => canOpen(user, i.href));
+    if (!visible.length) return null;
+    return (
+      <>
+        <div className="nav-label" style={first ? undefined : { marginTop: 20 }}>
+          {t(label)}
+        </div>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>{visible.map(item)}</nav>
+      </>
     );
   };
 
@@ -82,7 +103,7 @@ export function Sidebar({
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(10,26,47,.42)",
+          background: "rgba(21,25,52,.42)",
           zIndex: 55,
           opacity: open ? 1 : 0,
           pointerEvents: open ? "auto" : "none",
@@ -90,78 +111,39 @@ export function Sidebar({
         }}
       />
       <aside className="side" data-open={open}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px" }}>
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              background: "var(--color-ink)",
-              display: "grid",
-              placeItems: "center",
-              color: "#fff",
-              flex: "none",
-            }}
-          >
-            <Icon name="layers" size={17} />
-          </div>
-          <div>
-            <div style={{ fontWeight: 800, letterSpacing: "-0.03em", fontSize: 16 }}>ETQAN</div>
-            <div
-              style={{
-                fontSize: 10.5,
-                color: "var(--color-faint)",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                fontWeight: 700,
-              }}
-            >
-              Admin
-            </div>
-          </div>
-        </div>
+        <BrandLockup />
 
         <div>
-          <div className="nav-label">Content</div>
-          <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>{CONTENT.map(item)}</nav>
-          <div className="nav-label" style={{ marginTop: 20 }}>
-            Site
-          </div>
-          <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>{SITE.map(item)}</nav>
+          {group("Content", CONTENT, true)}
+          {group("Site", SITE)}
+          {group("Administration", ADMIN)}
         </div>
 
         <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-          <div
-            style={{
-              background: "var(--color-surface-2)",
-              border: "1px solid var(--color-line)",
-              borderRadius: "var(--radius-md)",
-              padding: "11px 12px",
-            }}
-          >
-            <span className={`badge ${USE_MOCK ? "b-warn" : "b-live"}`}>{USE_MOCK ? "Sample data" : "Live API"}</span>
+          {USE_MOCK ? (
             <div
               style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 10.5,
-                color: "var(--color-faint)",
-                marginTop: 5,
-                wordBreak: "break-all",
+                background: "var(--color-surface-2)",
+                border: "1px solid var(--color-line)",
+                borderRadius: "var(--radius-md)",
+                padding: "11px 12px",
               }}
             >
-              {USE_MOCK ? "no backend attached" : API_BASE}
+              <span className="badge b-warn">{t("Sample data")}</span>
+              <div style={{ fontSize: 10.5, color: "var(--color-faint)", marginTop: 5 }}>{t("no backend attached")}</div>
             </div>
-          </div>
-          {!USE_MOCK ? (
+          ) : null}
+          <LanguageToggle variant="nav" />
+          {!USE_MOCK && canOpen(user, "/settings") ? (
             <a className="nav-item" href={`${API_BASE}/api/docs/`} target="_blank" rel="noreferrer">
               <Icon name="code" size={18} style={{ opacity: 0.8, flex: "none" }} />
-              <span>API docs</span>
+              <span>{t("API docs")}</span>
               <Icon name="external" size={13} style={{ marginInlineStart: "auto", opacity: 0.5 }} />
             </a>
           ) : null}
           <button className="nav-item" onClick={signOut}>
-            <Icon name="logout" size={18} style={{ opacity: 0.8, flex: "none" }} />
-            <span>Sign out</span>
+            <Icon name="logout" size={18} style={{ opacity: 0.8, flex: "none" }} className="flip-rtl" />
+            <span>{t("Sign out")}</span>
           </button>
         </div>
       </aside>

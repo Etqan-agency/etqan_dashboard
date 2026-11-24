@@ -256,14 +256,34 @@ const serviceRefs = (slugs: string[]) =>
     .filter((s) => slugs.includes(s.slug))
     .map((s) => ({ slug: s.slug, title: s.title, title_ar: s.title_ar ?? "" }));
 
+const ALL_CAPABILITIES = [
+  "dashboard", "uploads", "blog.write_own", "content", "blog.review", "blog.publish",
+  "authors", "redirects", "settings", "messages", "users", "users.admins",
+];
+
 export const MOCK_USER = {
   id: "u1",
-  name: "Abdulkhalek",
-  email: "work@etqan.agency",
-  username: "abdulkhalek",
+  name: "Demo Admin",
+  email: "demo@example.com",
+  username: "demo",
   is_staff: true,
   is_admin: true,
+  role: "super_admin",
+  capabilities: ALL_CAPABILITIES,
   date_joined: iso(400),
+};
+
+/** Sample dashboard accounts for the Users screen in sample-data mode. */
+const mockUsers: any[] = [
+  { ...MOCK_USER, effective_role: "super_admin", is_active: true, last_login: iso(0) },
+  { id: "u2", name: "Sara Writer", email: "writer@example.com", username: "sara", role: "writer", effective_role: "writer", is_active: true, date_joined: iso(30), last_login: iso(2) },
+  { id: "u3", name: "Omar Editor", email: "editor@example.com", username: "omar", role: "editor", effective_role: "editor", is_active: true, date_joined: iso(60), last_login: iso(1) },
+];
+const mockSiteCopy: { en: Record<string, string>; ar: Record<string, string> } = { en: {}, ar: {} };
+
+const MOCK_POST_PERMISSIONS = {
+  edit: true, delete: true, submit: true, request_changes: true, approve: true,
+  publish: true, unpublish: true, comment: true,
 };
 
 export interface MockRequest {
@@ -282,6 +302,69 @@ export async function mockRequest(path: string, opts: MockRequest = { method: "G
   if (rawPath === "/api/auth/me/") return MOCK_USER;
   if (rawPath === "/api/auth/login/") return { access: "mock.access", refresh: "mock.refresh", user: MOCK_USER };
   if (rawPath === "/api/auth/logout/") return null;
+
+  // ---- users (sample-data mode only; the real API enforces every rule) ----
+  if (rawPath === "/api/users/") {
+    if (method === "POST") {
+      const { password: _pw, ...rest } = opts.body || {};
+      const u = { id: "u" + Math.random().toString(36).slice(2, 8), ...rest, effective_role: rest.role, date_joined: new Date().toISOString(), last_login: null };
+      mockUsers.push(u);
+      return u;
+    }
+    const rows = mockUsers.filter(
+      (u) =>
+        (!q.role || u.role === q.role) &&
+        (q.is_active === undefined || q.is_active === "" || String(u.is_active) === q.is_active) &&
+        (!q.search || JSON.stringify(u).toLowerCase().includes(q.search.toLowerCase())),
+    );
+    return { count: rows.length, next: null, previous: null, results: rows };
+  }
+  const userMatch = rawPath.match(/^\/api\/users\/([^/]+)\/$/);
+  if (userMatch) {
+    const u = mockUsers.find((x) => x.id === userMatch[1]);
+    if (!u) throw Object.assign(new Error("Not found."), { status: 404 });
+    if (method === "DELETE") u.is_active = false;
+    else if (method === "PATCH") {
+      const { password: _pw, ...rest } = opts.body || {};
+      Object.assign(u, rest, rest.role ? { effective_role: rest.role } : {});
+    }
+    return method === "DELETE" ? null : u;
+  }
+
+  // ---- website texts ----
+  if (rawPath === "/api/site-copy/") {
+    if (method === "PATCH" || method === "PUT") {
+      for (const l of ["en", "ar"] as const) {
+        if (method === "PUT") mockSiteCopy[l] = {};
+        for (const [k, v] of Object.entries((opts.body || {})[l] || {})) {
+          if (v) mockSiteCopy[l][k] = String(v);
+          else delete mockSiteCopy[l][k];
+        }
+      }
+    }
+    return { en: { ...mockSiteCopy.en }, ar: { ...mockSiteCopy.ar } };
+  }
+
+  // ---- blog workflow actions: accept and move the post along ----
+  const wf = rawPath.match(/^\/api\/blog\/([^/]+)\/(submit|request-changes|approve|publish|unpublish|comment|history)\/$/);
+  if (wf) {
+    const post = db.blog.find((p: any) => p.slug === decodeURIComponent(wf[1]));
+    if (!post) throw Object.assign(new Error("Not found."), { status: 404 });
+    if (wf[2] === "history") return { events: [], revisions: [] };
+    if (wf[2] === "comment") return null;
+    const next: Record<string, string> = {
+      submit: "in_review",
+      "request-changes": "changes_requested",
+      approve: "approved",
+      publish: "published",
+      unpublish: "draft",
+    };
+    post.status = next[wf[2]];
+    post.published = wf[2] === "publish";
+    if (wf[2] === "publish") post.published_at = opts.body?.published_at || new Date().toISOString();
+    if (opts.body?.note) post.review_note = opts.body.note;
+    return { ...post, permissions: MOCK_POST_PERMISSIONS };
+  }
 
   if (rawPath === "/api/uploads/" && method === "POST") {
     // No backend: preview the file from memory (the URL only lives for this tab).

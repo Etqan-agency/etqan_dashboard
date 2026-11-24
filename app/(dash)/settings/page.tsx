@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import type { SiteSettings } from "@/lib/types";
 import { invalidUrlKeys } from "@/lib/utils";
 import { useToast } from "@/providers/ToastProvider";
+import { t } from "@/lib/i18n";
 
 const EMPTY: SiteSettings = {
   hero_title: "",
@@ -31,6 +32,7 @@ const EMPTY: SiteSettings = {
   address_ar: "",
 };
 
+/* English source strings — translated with t() at render time. */
 /** Arabic twins are optional — the public API (`?lang=ar`) falls back to English. */
 const AR_HINT = "Leave blank to use the English text.";
 /** Stored by the API but not rendered by the public website yet. */
@@ -49,7 +51,7 @@ export default function SettingsPage() {
         const data = await api.get<SiteSettings>("/api/settings/");
         if (!cancelled) setForm({ ...EMPTY, ...data });
       } catch (err: any) {
-        if (!cancelled) toast(err.message ?? "Could not load site settings.", true);
+        if (!cancelled) toast(err.message ?? t("Could not load site settings."), true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -65,7 +67,10 @@ export default function SettingsPage() {
   async function save() {
     const bad = invalidUrlKeys(form.social_links);
     if (bad.length) {
-      toast(`Social links: "${bad.join('", "')}" must be a full URL starting with http:// or https://.`, true);
+      toast(
+        t('Social links: "{keys}" must be a full URL starting with http:// or https://.', { keys: bad.join('", "') }),
+        true,
+      );
       return;
     }
     setSaving(true);
@@ -74,16 +79,17 @@ export default function SettingsPage() {
       const payload = { ...form, values: form.values.filter((v) => v.title.trim()) };
       const saved = await api.patch<SiteSettings>("/api/settings/", payload);
       setForm({ ...EMPTY, ...saved });
-      toast("Site settings saved.");
+      toast(t("Site settings saved."));
     } catch (err: any) {
-      toast(err.message ?? "Save failed.", true);
+      toast(err.message ?? t("Save failed."), true);
     } finally {
       setSaving(false);
     }
   }
 
-  const text = (key: keyof SiteSettings, label: string, hint?: string, dir?: "rtl") => (
-    <Field label={label} hint={hint}>
+  /** English content fields stay ltr even in the Arabic UI; Arabic twins pass "rtl". */
+  const text = (key: keyof SiteSettings, label: string, hint?: string, dir: "rtl" | "ltr" = "ltr") => (
+    <Field label={t(label)} hint={hint ? t(hint) : undefined}>
       <input
         className="input"
         dir={dir}
@@ -92,8 +98,8 @@ export default function SettingsPage() {
       />
     </Field>
   );
-  const area = (key: keyof SiteSettings, label: string, hint?: string, dir?: "rtl") => (
-    <Field label={label} hint={hint}>
+  const area = (key: keyof SiteSettings, label: string, hint?: string, dir: "rtl" | "ltr" = "ltr") => (
+    <Field label={t(label)} hint={hint ? t(hint) : undefined}>
       <textarea
         className="input"
         dir={dir}
@@ -108,7 +114,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <>
-        <PageHead title="Site settings" sub="One record behind the whole site." />
+        <PageHead title={t("Site settings")} sub={t("One record behind the whole site.")} />
         <div className="card">
           <SkeletonRows count={6} />
         </div>
@@ -119,11 +125,11 @@ export default function SettingsPage() {
   return (
     <>
       <PageHead
-        title="Site settings"
-        sub="One record behind the whole site. Saving writes to PATCH /api/settings/."
+        title={t("Site settings")}
+        sub={t("One record behind the whole site. Saving writes to PATCH /api/settings/.")}
         actions={
           <button className="btn btn-blue" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("Saving…") : t("Save changes")}
           </button>
         }
       />
@@ -132,11 +138,11 @@ export default function SettingsPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
           <section className="card">
             <div className="card-head">
-              <h3 style={{ fontSize: 14, fontWeight: 700 }}>Homepage hero</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 700 }}>{t("Homepage hero")}</h3>
             </div>
             <div className="card-pad">
               {text("hero_title", "Hero title", NOT_SHOWN)}
-              {textAr("hero_title_ar", "Hero title", `${NOT_SHOWN} ${AR_HINT}`)}
+              {textAr("hero_title_ar", "Hero title", `${t(NOT_SHOWN)} ${t(AR_HINT)}`)}
               {area("hero_subtitle", "Hero subtitle")}
               {areaAr("hero_subtitle_ar", "Hero subtitle")}
               {text("announcement_text", "Announcement badge", "Short badge above the homepage hero. Leave empty to hide it.")}
@@ -146,7 +152,7 @@ export default function SettingsPage() {
 
           <section className="card">
             <div className="card-head">
-              <h3 style={{ fontSize: 14, fontWeight: 700 }}>About</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 700 }}>{t("About")}</h3>
             </div>
             <div className="card-pad">
               {area("company_about", "About")}
@@ -160,23 +166,25 @@ export default function SettingsPage() {
 
           <section className="card">
             <div className="card-head">
-              <h3 style={{ fontSize: 14, fontWeight: 700 }}>Values</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 700 }}>{t("Values")}</h3>
               <button
                 className="btn btn-ghost btn-sm"
                 style={{ marginInlineStart: "auto" }}
                 onClick={() => set("values", [...form.values, { title: "", description: "" }])}
               >
                 <Icon name="plus" size={13} strokeWidth={2.2} />
-                Add value
+                {t("Add value")}
               </button>
             </div>
             <div className="card-pad">
               {form.values.length === 0 ? (
-                <span className="hint">No values yet. {NOT_SHOWN}</span>
+                <span className="hint">
+                  {t("No values yet.")} {t(NOT_SHOWN)}
+                </span>
               ) : (
                 <>
                   <p className="hint" style={{ marginTop: 0, marginBottom: 9 }}>
-                    {NOT_SHOWN}
+                    {t(NOT_SHOWN)}
                   </p>
                   {form.values.map((v, i) => (
                     <div
@@ -199,19 +207,20 @@ export default function SettingsPage() {
                             color: "var(--color-faint)",
                           }}
                         >
-                          Value {i + 1}
+                          {t("Value {n}", { n: i + 1 })}
                         </span>
                         <button
-                          aria-label="Remove value"
+                          aria-label={t("Remove value")}
                           style={{ marginInlineStart: "auto", color: "var(--color-faint)" }}
                           onClick={() => set("values", form.values.filter((_, j) => j !== i))}
                         >
                           <Icon name="trash" size={14} />
                         </button>
                       </div>
-                      <Field label="Title">
+                      <Field label={t("Title")}>
                         <input
                           className="input"
+                          dir="ltr"
                           value={v.title}
                           onChange={(e) => {
                             const next = [...form.values];
@@ -220,9 +229,10 @@ export default function SettingsPage() {
                           }}
                         />
                       </Field>
-                      <Field label="Description">
+                      <Field label={t("Description")}>
                         <textarea
                           className="input"
+                          dir="ltr"
                           value={v.description}
                           onChange={(e) => {
                             const next = [...form.values];
@@ -242,7 +252,7 @@ export default function SettingsPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
           <section className="card">
             <div className="card-head">
-              <h3 style={{ fontSize: 14, fontWeight: 700 }}>Contact</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 700 }}>{t("Contact")}</h3>
             </div>
             <div className="card-pad">
               {text("contact_email", "Contact email")}
@@ -254,7 +264,7 @@ export default function SettingsPage() {
 
           <section className="card">
             <div className="card-head">
-              <h3 style={{ fontSize: 14, fontWeight: 700 }}>Stats</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 700 }}>{t("Stats")}</h3>
             </div>
             <div className="card-pad">
               <KeyValueInput
@@ -263,14 +273,14 @@ export default function SettingsPage() {
                 keyPlaceholder="projects"
               />
               <p className="hint" style={{ marginTop: 8 }}>
-                {NOT_SHOWN} Free-form keys are stored for future use.
+                {t(NOT_SHOWN)} {t("Free-form keys are stored for future use.")}
               </p>
             </div>
           </section>
 
           <section className="card">
             <div className="card-head">
-              <h3 style={{ fontSize: 14, fontWeight: 700 }}>Social links</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 700 }}>{t("Social links")}</h3>
             </div>
             <div className="card-pad">
               <KeyValueInput
@@ -280,7 +290,7 @@ export default function SettingsPage() {
                 urlValues
               />
               <p className="hint" style={{ marginTop: 8 }}>
-                Use full URLs, e.g. https://www.linkedin.com/company/…
+                {t("Use full URLs, e.g. https://www.linkedin.com/company/…")}
               </p>
             </div>
           </section>

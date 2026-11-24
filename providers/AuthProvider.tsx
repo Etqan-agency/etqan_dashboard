@@ -2,7 +2,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { USE_MOCK, login as apiLogin, logout as apiLogout, me, tokens } from "@/lib/api";
+import { SESSION_EXPIRED_EVENT, USE_MOCK, login as apiLogin, logout as apiLogout, me, tokens } from "@/lib/api";
+import { t } from "@/lib/i18n";
+import { can } from "@/lib/roles";
 import type { User } from "@/lib/types";
 
 interface AuthValue {
@@ -10,6 +12,8 @@ interface AuthValue {
   ready: boolean;
   signIn: (loginId: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** re-read /me, e.g. after an admin changed your role */
+  reload: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue>({
@@ -17,21 +21,45 @@ const AuthContext = createContext<AuthValue>({
   ready: false,
   signIn: async () => {},
   signOut: async () => {},
+  reload: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
+
+const isAuthError = (err: unknown) => {
+  const status = (err as { status?: number } | null)?.status;
+  return status === 401 || status === 403;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const router = useRouter();
 
+  const reload = useCallback(async () => {
+    try {
+      const u = await me();
+      setUser(can(u, "dashboard") ? u : null);
+    } catch (err) {
+      // Only a refused session ends it; a network blip or a 5xx keeps the tokens.
+      if (isAuthError(err)) {
+        tokens.clear();
+        setUser(null);
+      }
+    }
+  }, []);
+
   // Rehydrate on load: a stored refresh token means the session survives a reload.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (USE_MOCK) {
-        setReady(true);
+        try {
+          const u = await me();
+          if (!cancelled) setUser(u);
+        } finally {
+          if (!cancelled) setReady(true);
+        }
         return;
       }
       if (!tokens.access && !tokens.refresh) {
@@ -40,9 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const u = await me();
-        if (!cancelled) setUser(u);
-      } catch {
-        tokens.clear();
+        if (!cancelled) setUser(can(u, "dashboard") ? u : null);
+      } catch (err) {
+        if (isAuthError(err)) tokens.clear();
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -52,12 +80,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // The API client gave up refreshing: drop the user and go to the login screen.
+  useEffect(() => {
+    const onExpired = () => {
+      setUser(null);
+      router.replace("/login?expired=1");
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, [router]);
+
   const signIn = useCallback(async (loginId: string, password: string) => {
     const data = await apiLogin(loginId, password);
-    const u = data.user ?? (await me());
-    if (!u.is_staff && !u.is_admin) {
+    const u = await me().catch(() => data.user as User);
+    if (!can(u, "dashboard")) {
       await apiLogout();
-      throw new Error("That account is not staff — it can read the site but not edit it.");
+      throw new Error(t("That account has no dashboard role. Ask an admin to give it one."));
     }
     setUser(u);
   }, []);
@@ -68,5 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   }, [router]);
 
-  return <AuthContext.Provider value={{ user, ready, signIn, signOut }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, ready, signIn, signOut, reload }}>{children}</AuthContext.Provider>
+  );
 }

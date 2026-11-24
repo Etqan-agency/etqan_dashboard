@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { request } from "@/lib/api";
 import { useToast } from "@/providers/ToastProvider";
+import { intlLocale, t } from "@/lib/i18n";
 
 /** Largest inline image the API accepts (POST /api/uploads/). */
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -24,6 +25,7 @@ export function textStats(text: string) {
 
 type Edit = { before: string; after: string; placeholder: string; block?: boolean; line?: string };
 
+/** English source labels/titles — translated with t() at render time. */
 const ACTIONS: { key: string; label: string; title: string; edit: Edit }[] = [
   { key: "h2", label: "H2", title: "Heading 2", edit: { before: "", after: "", placeholder: "Heading", line: "## " } },
   { key: "h3", label: "H3", title: "Heading 3", edit: { before: "", after: "", placeholder: "Subheading", line: "### " } },
@@ -34,6 +36,17 @@ const ACTIONS: { key: string; label: string; title: string; edit: Edit }[] = [
   { key: "quote", label: "Quote", title: "Quote", edit: { before: "", after: "", placeholder: "Quote", line: "> " } },
   { key: "code", label: "</>", title: "Code (inline, or a block for multiple lines)", edit: { before: "`", after: "`", placeholder: "code", block: true } },
 ];
+
+/** Placeholder text inserted into Arabic (rtl) content — follows the content language, not the UI. */
+const AR_PLACEHOLDERS: Record<string, string> = {
+  Heading: "عنوان",
+  Subheading: "عنوان فرعي",
+  "bold text": "نص عريض",
+  "link text": "نص الرابط",
+  "List item": "عنصر في القائمة",
+  Quote: "اقتباس",
+  code: "code",
+};
 
 /**
  * Markdown textarea with a formatting toolbar, a live preview tab (RTL for Arabic),
@@ -71,7 +84,8 @@ export function MarkdownEditor({
     });
   }
 
-  function apply(edit: Edit) {
+  function apply(raw: Edit) {
+    const edit = rtl ? { ...raw, placeholder: AR_PLACEHOLDERS[raw.placeholder] ?? raw.placeholder } : raw;
     const el = ref.current;
     const start = el?.selectionStart ?? text.length;
     replaceSelection((selected) => {
@@ -101,11 +115,11 @@ export function MarkdownEditor({
 
   async function upload(file: File) {
     if (!ACCEPT.split(",").includes(file.type)) {
-      toast("Use a JPEG, PNG, WebP or GIF image.", true);
+      toast(t("Use a JPEG, PNG, WebP or GIF image."), true);
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast("Images must be 5 MB or smaller.", true);
+      toast(t("Images must be 5 MB or smaller."), true);
       return;
     }
     setUploading(true);
@@ -123,9 +137,9 @@ export function MarkdownEditor({
         const lead = start === 0 || text[start - 1] === "\n" ? "" : "\n";
         return { text: `${lead}${md}\n`, selectFrom: lead.length + 2, selectTo: lead.length + 2 + label.length };
       });
-      toast("Image uploaded — edit the alt text in the brackets.");
+      toast(t("Image uploaded — edit the alt text in the brackets."));
     } catch (err: any) {
-      toast(err.message ?? "Upload failed.", true);
+      toast(err.message ?? t("Upload failed."), true);
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -149,34 +163,34 @@ export function MarkdownEditor({
     <div className="md-editor">
       <div className="md-bar">
         <div role="tablist" style={{ display: "flex", gap: 2 }}>
-          {tabBtn("write", "Write")}
-          {tabBtn("preview", "Preview")}
+          {tabBtn("write", t("Write"))}
+          {tabBtn("preview", t("Preview"))}
         </div>
         {tab === "write" ? (
-          <div className="md-tools" role="toolbar" aria-label="Formatting">
+          <div className="md-tools" role="toolbar" aria-label={t("Formatting")}>
             {ACTIONS.map((a) => (
               <button
                 key={a.key}
                 type="button"
                 className="md-tool"
-                title={a.title}
-                aria-label={a.title}
+                title={t(a.title)}
+                aria-label={t(a.title)}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => apply(a.edit)}
                 style={a.key === "bold" ? { fontWeight: 800 } : a.key === "code" ? { fontFamily: "var(--font-mono)" } : undefined}
               >
-                {a.label}
+                {t(a.label)}
               </button>
             ))}
             <button
               type="button"
               className="md-tool"
-              title="Upload an image (JPEG, PNG, WebP or GIF, max 5 MB)"
+              title={t("Upload an image (JPEG, PNG, WebP or GIF, max 5 MB)")}
               disabled={uploading}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => fileRef.current?.click()}
             >
-              {uploading ? "Uploading…" : "Image"}
+              {uploading ? t("Uploading…") : t("Image")}
             </button>
             <input
               ref={fileRef}
@@ -225,16 +239,17 @@ export function MarkdownEditor({
           {text.trim() ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           ) : (
-            <p style={{ color: "var(--color-faint)" }}>Nothing to preview yet.</p>
+            <p style={{ color: "var(--color-faint)" }}>{t("Nothing to preview yet.")}</p>
           )}
         </div>
       )}
 
       <div className="md-foot">
         <span>
-          {stats.words.toLocaleString()} {stats.words === 1 ? "word" : "words"} · {stats.minutes} min read
+          {t(stats.words === 1 ? "{n} word" : "{n} words", { n: stats.words.toLocaleString(intlLocale()) })} ·{" "}
+          {t("{n} min read", { n: stats.minutes })}
         </span>
-        <span>Markdown · ⌘B bold · ⌘K link · paste an image to upload it</span>
+        <span>{t("Markdown · ⌘B bold · ⌘K link · paste an image to upload it")}</span>
       </div>
     </div>
   );

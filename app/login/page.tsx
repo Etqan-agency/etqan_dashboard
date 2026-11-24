@@ -1,25 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { PrimaryButton } from "@/components/ui";
 import { Field } from "@/components/fields";
-import { API_BASE, USE_MOCK } from "@/lib/api";
+import { BrandLockup, LanguageToggle } from "@/components/Brand";
+import { USE_MOCK } from "@/lib/api";
+import { t } from "@/lib/i18n";
 import { useAuth } from "@/providers/AuthProvider";
+
+const alertStyle = (tone: "clay" | "amber") => ({
+  background: `var(--color-${tone}-tint)`,
+  color: `var(--color-${tone})`,
+  borderRadius: "var(--radius-md)",
+  padding: "10px 13px",
+  fontSize: 12.5,
+  fontWeight: 600,
+  marginBottom: 14,
+});
 
 export default function LoginPage() {
   const router = useRouter();
   const { signIn } = useAuth();
-  const [loginId, setLoginId] = useState("work@etqan.agency");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("expired")) setError(t("Your session ended. Sign in again."));
+  }, []);
 
   async function submit() {
     setError("");
     if (!loginId || !password) {
-      setError("Enter your login and password.");
+      setError(t("Enter your login and password."));
       return;
     }
     setBusy(true);
@@ -27,7 +44,13 @@ export default function LoginPage() {
       await signIn(loginId, password);
       router.push("/overview");
     } catch (err: any) {
-      setError(err?.status === 401 ? "Wrong login or password." : err.message || "Sign in failed.");
+      setError(
+        err?.status === 401
+          ? t("Wrong login or password.")
+          : err?.status === 429
+            ? t("Too many attempts. Wait a few minutes and try again.")
+            : err?.message || t("Sign in failed."),
+      );
     } finally {
       setBusy(false);
     }
@@ -40,112 +63,83 @@ export default function LoginPage() {
         display: "grid",
         placeItems: "center",
         padding: 20,
-        background: "linear-gradient(170deg, var(--color-sky), var(--color-paper) 46%)",
+        background: "var(--login-bg)",
       }}
     >
-      <div
-        className="card"
-        style={{ width: "100%", maxWidth: 420, padding: 30, boxShadow: "var(--shadow-e3)" }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              background: "var(--color-ink)",
-              display: "grid",
-              placeItems: "center",
-              color: "#fff",
-            }}
-          >
-            <Icon name="layers" size={17} />
+      <div className="card" style={{ width: "100%", maxWidth: 420, padding: 30, boxShadow: "var(--shadow-e3)" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 24 }}>
+          <div style={{ marginInlineStart: -8 }}>
+            <BrandLockup />
           </div>
-          <div>
-            <div style={{ fontWeight: 800, letterSpacing: "-0.03em", fontSize: 16 }}>ETQAN</div>
-            <div
-              style={{
-                fontSize: 10.5,
-                color: "var(--color-faint)",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                fontWeight: 700,
-              }}
-            >
-              Admin
-            </div>
+          <div style={{ marginInlineStart: "auto" }}>
+            <LanguageToggle />
           </div>
         </div>
 
-        <h1 style={{ fontSize: 23, letterSpacing: "-0.035em", fontWeight: 800 }}>Sign in to manage the site</h1>
+        <h1 style={{ fontSize: 23, letterSpacing: "-0.02em", fontWeight: 700 }}>{t("Sign in to manage the site")}</h1>
         <p style={{ color: "var(--color-muted)", fontSize: 13, margin: "6px 0 22px" }}>
-          Staff accounts only. Everything you publish here goes live on etqan.agency.
+          {t("Staff accounts only. Everything you publish here goes live on etqan.agency.")}
         </p>
 
         {USE_MOCK ? (
-          <div
-            style={{
-              background: "var(--color-amber-tint)",
-              color: "var(--color-amber)",
-              borderRadius: "var(--radius-md)",
-              padding: "11px 13px",
-              fontSize: 12.5,
-              fontWeight: 600,
-              marginBottom: 16,
-            }}
-          >
-            Running on sample data — no backend attached. Set NEXT_PUBLIC_API_BASE to connect the real API.
+          <div style={alertStyle("amber")}>
+            {t("Running on sample data — no backend attached. Set NEXT_PUBLIC_API_BASE to connect the real API.")}
           </div>
         ) : null}
 
         {error ? (
-          <div
-            role="alert"
-            style={{
-              background: "var(--color-clay-tint)",
-              color: "var(--color-clay)",
-              borderRadius: "var(--radius-md)",
-              padding: "10px 13px",
-              fontSize: 12.5,
-              fontWeight: 600,
-              marginBottom: 14,
-            }}
-          >
+          <div role="alert" style={alertStyle("clay")}>
             {error}
           </div>
         ) : null}
 
         {USE_MOCK ? (
           <PrimaryButton className="btn-wide" onClick={() => router.push("/overview")}>
-            Open the dashboard
+            {t("Open the dashboard")}
           </PrimaryButton>
         ) : (
-          <>
-            <Field label="Email or username">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit();
+            }}
+          >
+            <Field label={t("Email or username")}>
               <input
                 className="input"
+                dir="ltr"
                 autoComplete="username"
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
               />
             </Field>
-            <Field label="Password">
-              <input
-                className="input"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && submit()}
-              />
+            <Field label={t("Password")}>
+              <div style={{ position: "relative" }} dir="ltr">
+                <input
+                  className="input"
+                  dir="ltr"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ paddingInlineEnd: 44 }}
+                />
+                <button
+                  type="button"
+                  className="pw-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? t("Hide password") : t("Show password")}
+                  aria-pressed={showPassword}
+                  title={showPassword ? t("Hide password") : t("Show password")}
+                >
+                  <Icon name={showPassword ? "eyeOff" : "eye"} size={17} />
+                </button>
+              </div>
             </Field>
-            <PrimaryButton className="btn-wide" onClick={submit} disabled={busy}>
-              {busy ? "Signing in…" : "Sign in"}
+            <PrimaryButton type="submit" className="btn-wide" disabled={busy}>
+              {busy ? t("Signing in…") : t("Sign in")}
             </PrimaryButton>
-            <p className="hint" style={{ marginTop: 14, textAlign: "center", fontFamily: "var(--font-mono)" }}>
-              {API_BASE}
-            </p>
-          </>
+          </form>
         )}
       </div>
     </main>

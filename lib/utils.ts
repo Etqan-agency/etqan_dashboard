@@ -1,3 +1,5 @@
+import { intlLocale, t } from "./i18n";
+
 export function truncate(value: unknown, max: number) {
   const s = String(value ?? "");
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
@@ -5,7 +7,7 @@ export function truncate(value: unknown, max: number) {
 
 export function formatDate(value?: string | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString(undefined, {
+  return new Date(value).toLocaleDateString(intlLocale(), {
     day: "2-digit",
     month: "short",
     year: "2-digit",
@@ -15,10 +17,10 @@ export function formatDate(value?: string | null) {
 export function timeAgo(value?: string | null) {
   if (!value) return "";
   const minutes = (Date.now() - new Date(value).getTime()) / 60000;
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${Math.floor(minutes)}m ago`;
-  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
-  if (minutes < 10080) return `${Math.floor(minutes / 1440)}d ago`;
+  if (minutes < 1) return t("just now");
+  if (minutes < 60) return t("{n}m ago", { n: Math.floor(minutes) });
+  if (minutes < 1440) return t("{n}h ago", { n: Math.floor(minutes / 60) });
+  if (minutes < 10080) return t("{n}d ago", { n: Math.floor(minutes / 1440) });
   return formatDate(value);
 }
 

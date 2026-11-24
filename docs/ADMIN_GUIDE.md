@@ -4,9 +4,29 @@ What to enter in the dashboard once the website and dashboard are live on your d
 
 > **Golden rules**
 > 1. **Real information only.** No invented numbers, clients, reviews, awards or results. If you can't prove it, don't publish it.
-> 2. **English + Arabic together.** Every time you edit an English field, fill its **(Arabic)** twin in the same session. A blank Arabic field shows the site's built-in Arabic text, or hides the content on Arabic pages. It never shows English text there.
+> 2. **English + Arabic together.** Every time you edit an English field, fill its **(Arabic)** twin in the same session. A blank Arabic field shows the English text on Arabic pages, so leaving it blank is visible to Arabic visitors.
 > 3. **Saving updates the website within seconds.** Each save refreshes the affected pages automatically. If something doesn't show, wait one minute (normal cache).
 > 4. **Don't change slugs casually.** A slug is part of the page URL. Changing it is safe (a 301 redirect is created automatically), but do it only for a good reason, never repeatedly.
+
+---
+
+## 0. Users, roles, language and the article workflow
+
+**Language.** Switch the dashboard between English and العربية from the sidebar (or the login screen). The choice is remembered on that device; Arabic switches the whole layout to right-to-left.
+
+**Users** (sidebar → Administration → Users, admins only). Create an account per person — never share logins. Accounts are *deactivated*, never deleted, so their articles keep their history. Deactivating, changing a role or setting a new password signs that person out everywhere.
+
+| Role | Can do |
+|---|---|
+| Writer (كاتب) | Write their own articles and send them for review. Can't publish. |
+| Content creator (صانع محتوى) | Writer + edit website content: services, portfolio, testimonials, team, clients, FAQs, website texts. |
+| Editor (محرر) | Content creator + review, comment, request changes, approve, schedule and publish **any** article; manage authors. |
+| Admin (مسؤول) | Everything on the site: settings, inbox, redirects, and user accounts below admin. |
+| Super admin (مسؤول أعلى) | Admin + manage admins and super admins. The last super admin can't be demoted or deactivated. |
+
+**Article workflow.** Draft → *Submit for review* → the editor either *Requests changes* (with a note the writer sees) or *Approves* → *Publish now* or *Schedule* for a later time. Writers can edit their article only while it is a draft or has changes requested. Every step, comment and earlier version is kept under **History and revisions** in the article, and an earlier version can be restored. Unsaved text is also kept on your device and offered back if the browser closes before you save.
+
+**Website texts** (sidebar → Site → Website texts). Every fixed text on the public site (headings, intros, buttons, footer, legal pages) in English and Arabic. Leave a box empty to keep the built-in text.
 
 ---
 

@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Icon, type IconName } from "./Icon";
 import { cx } from "@/lib/utils";
+import { isRtl, t } from "@/lib/i18n";
 
 /* ---------------- Badge ---------------- */
 export function Badge({ tone, children }: { tone: "live" | "draft" | "blue" | "warn" | "late" | "sky"; children: ReactNode }) {
@@ -136,14 +137,14 @@ export function Pager({
       }}
     >
       <span style={{ color: "var(--color-muted)", fontSize: 12.5 }}>
-        {from}–{to} of {count}
+        {t("{from}–{to} of {count}", { from, to, count })}
       </span>
       <div style={{ marginInlineStart: "auto", display: "flex", gap: 7 }}>
         <button className="btn btn-ghost btn-sm" disabled={!hasPrevious} onClick={() => onPage(page - 1)}>
-          Previous
+          {t("Previous")}
         </button>
         <button className="btn btn-ghost btn-sm" disabled={!hasNext} onClick={() => onPage(page + 1)}>
-          Next
+          {t("Next")}
         </button>
       </div>
     </div>
@@ -196,7 +197,7 @@ export function Drawer({
           background: "var(--color-surface)",
           zIndex: 100,
           boxShadow: "var(--shadow-e3)",
-          transform: open ? "none" : "translateX(100%)",
+          transform: open ? "none" : isRtl() ? "translateX(-100%)" : "translateX(100%)",
           transition: "transform 220ms var(--ease-brand)",
           display: "flex",
           flexDirection: "column",
@@ -212,7 +213,7 @@ export function Drawer({
           }}
         >
           <h2 style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 700, letterSpacing: "-0.02em" }}>{title}</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
+          <button className="icon-btn" onClick={onClose} aria-label={t("Close")}>
             <Icon name="x" size={17} strokeWidth={2} />
           </button>
         </div>

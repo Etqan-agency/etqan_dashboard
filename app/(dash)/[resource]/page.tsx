@@ -3,11 +3,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { notFound, useParams } from "next/navigation";
 import { EmptyState, PageHead, Pager, PrimaryButton, SkeletonRows } from "@/components/ui";
-import { ResourceEditor } from "@/components/ResourceEditor";
-import { RESOURCES } from "@/lib/resources";
+import { ResourceEditor, writeCapability } from "@/components/ResourceEditor";
+import { PostStatusBadge } from "@/components/BlogWorkflow";
+import { RESOURCES, type ColumnDef, type FilterDef } from "@/lib/resources";
 import { api } from "@/lib/api";
+import { t } from "@/lib/i18n";
+import { can } from "@/lib/roles";
 import type { AnyRecord, Paginated } from "@/lib/types";
+import { useAuth } from "@/providers/AuthProvider";
 import { useSearch } from "@/providers/SearchProvider";
+
+/** Blog: workflow status instead of the plain published flag. */
+const BLOG_STATUS_FILTER: FilterDef = {
+  param: "status",
+  options: [
+    ["", "All states"],
+    ["draft", "Draft"],
+    ["in_review", "In review"],
+    ["changes_requested", "Changes requested"],
+    ["approved", "Approved"],
+    ["published", "Published"],
+  ],
+};
 import { useToast } from "@/providers/ToastProvider";
 
 export default function ResourcePage() {
@@ -17,7 +34,17 @@ export default function ResourcePage() {
   if (!def) notFound();
 
   const toast = useToast();
+  const { user } = useAuth();
   const { debounced } = useSearch();
+  const isBlog = def.path === "/api/blog/";
+  const canWrite = can(user, writeCapability(def));
+  const filterDefs: FilterDef[] = isBlog ? [BLOG_STATUS_FILTER] : (def.filters ?? []);
+  const columns: ColumnDef[] = isBlog
+    ? [
+        ...def.columns.filter((c) => c.header !== "Status"),
+        { header: "Status", cell: (r) => <PostStatusBadge record={r} /> },
+      ]
+    : def.columns;
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
@@ -66,8 +93,8 @@ export default function ResourcePage() {
   const orderOptions = useMemo(
     () =>
       def.ordering.flatMap((field) => [
-        [field, `Sort: ${field.replace(/_/g, " ")} ↑`],
-        [`-${field}`, `Sort: ${field.replace(/_/g, " ")} ↓`],
+        [field, t("Sort: {field} ↑", { field: t(field.replace(/_/g, " ")) })],
+        [`-${field}`, t("Sort: {field} ↓", { field: t(field.replace(/_/g, " ")) })],
       ]) as [string, string][],
     [def],
   );
@@ -87,13 +114,13 @@ export default function ResourcePage() {
   return (
     <>
       <PageHead
-        title={def.title}
-        sub={def.sub}
-        actions={<PrimaryButton onClick={openNew}>New {def.noun}</PrimaryButton>}
+        title={t(def.title)}
+        sub={t(def.sub)}
+        actions={canWrite ? <PrimaryButton onClick={openNew}>{t("Add {noun}", { noun: t(def.noun) })}</PrimaryButton> : null}
       />
 
       <div className="toolbar">
-        {(def.filters ?? []).map((f) => (
+        {filterDefs.map((f) => (
           <select
             key={f.param}
             className="sel"
@@ -105,7 +132,7 @@ export default function ResourcePage() {
           >
             {f.options.map(([v, l]) => (
               <option key={v} value={v}>
-                {l}
+                {t(l)}
               </option>
             ))}
           </select>
@@ -135,7 +162,7 @@ export default function ResourcePage() {
         >
           {[12, 24, 48, 100].map((n) => (
             <option key={n} value={n}>
-              {n} / page
+              {t("{n} / page", { n })}
             </option>
           ))}
         </select>
@@ -148,27 +175,27 @@ export default function ResourcePage() {
           <EmptyState
             icon="x"
             tone="clay"
-            title={`Couldn't load ${def.title.toLowerCase()}`}
+            title={t("Couldn't load {what}", { what: t(def.title) })}
             body={error}
             action={
               <button className="btn btn-ghost btn-sm" onClick={load}>
-                Try again
+                {t("Try again")}
               </button>
             }
           />
         ) : rows.length === 0 ? (
           <EmptyState
             icon={def.icon}
-            title={hasFilters ? "No matches" : "Nothing here yet"}
+            title={hasFilters ? t("No matches") : t("Nothing here yet")}
             body={
               hasFilters
-                ? "No records match the current search and filters."
-                : `Add your first ${def.noun} to see it on the site.`
+                ? t("No records match the current search and filters.")
+                : t("Add your first {noun} to see it on the site.", { noun: t(def.noun) })
             }
             action={
-              hasFilters ? null : (
+              hasFilters || !canWrite ? null : (
                 <button className="btn btn-blue btn-sm" onClick={openNew}>
-                  New {def.noun}
+                  {t("Add {noun}", { noun: t(def.noun) })}
                 </button>
               )
             }
@@ -178,8 +205,8 @@ export default function ResourcePage() {
             <table className="tbl">
               <thead>
                 <tr>
-                  {def.columns.map((c) => (
-                    <th key={c.header}>{c.header}</th>
+                  {columns.map((c) => (
+                    <th key={c.header}>{t(c.header)}</th>
                   ))}
                   <th />
                 </tr>
@@ -187,7 +214,7 @@ export default function ResourcePage() {
               <tbody>
                 {rows.map((record) => (
                   <tr key={record.id} onClick={() => openEdit(record)}>
-                    {def.columns.map((c) => (
+                    {columns.map((c) => (
                       <td key={c.header}>{c.cell(record)}</td>
                     ))}
                     <td style={{ textAlign: "end" }}>
@@ -198,7 +225,7 @@ export default function ResourcePage() {
                           openEdit(record);
                         }}
                       >
-                        Edit
+                        {(isBlog ? record.permissions?.edit : canWrite) ? t("Edit") : t("Open")}
                       </button>
                     </td>
                   </tr>

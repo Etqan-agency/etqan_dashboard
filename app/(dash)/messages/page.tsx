@@ -8,7 +8,9 @@ import type { LeadStatus, Message, Paginated } from "@/lib/types";
 import { formatDate, timeAgo } from "@/lib/utils";
 import { useSearch } from "@/providers/SearchProvider";
 import { useToast } from "@/providers/ToastProvider";
+import { isRtl, t } from "@/lib/i18n";
 
+/** English labels — translated with t() at render time. */
 const FILTERS: [string, string][] = [
   ["", "All"],
   ["false", "Unread"],
@@ -40,7 +42,8 @@ const notifyShell = () => window.dispatchEvent(new Event("etqan:inbox-changed"))
 
 function StatusPill({ status, label }: { status?: LeadStatus; label?: string }) {
   const s = (status ?? "new") as LeadStatus;
-  return <Badge tone={STATUS_TONE[s] ?? "draft"}>{label || STATUS_LABEL[s] || s}</Badge>;
+  // known statuses use our own (translated) label; the API's status_display is English-only
+  return <Badge tone={STATUS_TONE[s] ?? "draft"}>{STATUS_LABEL[s] ? t(STATUS_LABEL[s]) : label || s}</Badge>;
 }
 
 /** Digits only, for https://wa.me/<digits>. */
@@ -52,7 +55,7 @@ const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, "")}`;
 function primaryContact(m: Message) {
   if (m.email) return m.email;
   if (m.phone) return m.phone;
-  return "no contact details";
+  return t("no contact details");
 }
 
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
@@ -67,7 +70,17 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 function Attribution({ m }: { m: Message }) {
   const rows: [string, ReactNode][] = [];
   const add = (label: string, value?: string | null, mono = false) => {
-    if (value) rows.push([label, mono ? <span style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{value}</span> : value]);
+    if (value)
+      rows.push([
+        t(label),
+        mono ? (
+          <span dir="ltr" style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>
+            {value}
+          </span>
+        ) : (
+          value
+        ),
+      ]);
   };
   add("Source", m.utm_source);
   add("Medium", m.utm_medium);
@@ -75,7 +88,7 @@ function Attribution({ m }: { m: Message }) {
   add("Term", m.utm_term);
   add("Content", m.utm_content);
   const clickIds = [m.gclid ? "Google Ads (gclid)" : "", m.fbclid ? "Meta (fbclid)" : ""].filter(Boolean).join(" · ");
-  if (clickIds) rows.push(["Ad click ID", clickIds]);
+  if (clickIds) rows.push([t("Ad click ID"), clickIds]);
   add("Referrer", m.referrer, true);
   add("Landing page", m.landing_page, true);
   add("Submitted from", m.page_path, true);
@@ -83,7 +96,7 @@ function Attribution({ m }: { m: Message }) {
   return (
     <div style={{ marginBottom: 15 }}>
       <div className="field-label" style={{ marginBottom: 6 }}>
-        Attribution
+        {t("Attribution")}
       </div>
       {rows.length ? (
         rows.map(([label, value]) => (
@@ -92,7 +105,7 @@ function Attribution({ m }: { m: Message }) {
           </DetailRow>
         ))
       ) : (
-        <span className="hint">No tracking data — the visitor arrived directly or blocked tracking parameters.</span>
+        <span className="hint">{t("No tracking data — the visitor arrived directly or blocked tracking parameters.")}</span>
       )}
     </div>
   );
@@ -125,7 +138,7 @@ export default function MessagesPage() {
       });
       setData(result);
     } catch (err: any) {
-      setError(err.message ?? "Request failed.");
+      setError(err.message ?? t("Request failed."));
     } finally {
       setLoading(false);
     }
@@ -142,11 +155,11 @@ export default function MessagesPage() {
   async function markRead(m: Message) {
     try {
       await api.patch(`/api/messages/${m.id}/mark-read/`, {});
-      toast("Marked as read.");
+      toast(t("Marked as read."));
       load();
       notifyShell();
     } catch (err: any) {
-      toast(err.message ?? "Could not update the message.", true);
+      toast(err.message ?? t("Could not update the message."), true);
     }
   }
 
@@ -154,12 +167,12 @@ export default function MessagesPage() {
     try {
       // staff can change is_read, status and service; the submission itself is read-only
       await api.patch(`/api/messages/${m.id}/`, { is_read: !m.is_read });
-      toast(m.is_read ? "Marked as unread." : "Marked as read.");
+      toast(m.is_read ? t("Marked as unread.") : t("Marked as read."));
       setOpen(null);
       load();
       notifyShell();
     } catch (err: any) {
-      toast(err.message ?? "Could not update the message.", true);
+      toast(err.message ?? t("Could not update the message."), true);
     }
   }
 
@@ -170,24 +183,24 @@ export default function MessagesPage() {
       const merged: Message = saved ? { ...m, ...saved } : { ...m, status: next, status_display: STATUS_LABEL[next] };
       setOpen((cur) => (cur && cur.id === m.id ? merged : cur));
       setData((cur) => (cur ? { ...cur, results: cur.results.map((r) => (r.id === m.id ? merged : r)) } : cur));
-      toast(`Status set to ${STATUS_LABEL[next]}.`);
+      toast(t("Status set to {status}.", { status: t(STATUS_LABEL[next]) }));
       // the row may no longer match the active status filter
       if (status && status !== next) load();
     } catch (err: any) {
-      toast(err.message ?? "Could not update the status.", true);
+      toast(err.message ?? t("Could not update the status."), true);
     }
   }
 
   async function destroy(m: Message) {
-    if (!window.confirm("Delete this message?")) return;
+    if (!window.confirm(t("Delete this message?"))) return;
     try {
       await api.remove(`/api/messages/${m.id}/`);
-      toast("Message deleted.");
+      toast(t("Message deleted."));
       setOpen(null);
       load();
       notifyShell();
     } catch (err: any) {
-      toast(err.message ?? "Could not delete the message.", true);
+      toast(err.message ?? t("Could not delete the message."), true);
     }
   }
 
@@ -195,11 +208,15 @@ export default function MessagesPage() {
     try {
       const unread = await api.list<Message>("/api/messages/", { is_read: "false", page_size: 100 });
       await Promise.all(unread.results.map((m) => api.patch(`/api/messages/${m.id}/mark-read/`, {})));
-      toast(`Marked ${unread.results.length} message${unread.results.length === 1 ? "" : "s"} as read.`);
+      toast(
+        t(unread.results.length === 1 ? "Marked 1 message as read." : "Marked {n} messages as read.", {
+          n: unread.results.length,
+        }),
+      );
       load();
       notifyShell();
     } catch (err: any) {
-      toast(err.message ?? "Could not update the inbox.", true);
+      toast(err.message ?? t("Could not update the inbox."), true);
     }
   }
 
@@ -208,11 +225,11 @@ export default function MessagesPage() {
   return (
     <>
       <PageHead
-        title="Inbox"
-        sub="Leads from the contact form. Track each one through the pipeline with its status."
+        title={t("Inbox")}
+        sub={t("Leads from the contact form. Track each one through the pipeline with its status.")}
         actions={
           <button className="btn btn-ghost" onClick={markAllRead}>
-            Mark all read
+            {t("Mark all read")}
           </button>
         }
       />
@@ -220,21 +237,21 @@ export default function MessagesPage() {
       <div className="toolbar">
         {FILTERS.map(([value, label]) => (
           <button key={label} className="chip" data-on={isRead === value} onClick={() => setIsRead(value)}>
-            {label}
+            {t(label)}
           </button>
         ))}
-        <select className="sel" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter by status">
-          <option value="">All statuses</option>
+        <select className="sel" value={status} onChange={(e) => setStatus(e.target.value)} aria-label={t("Filter by status")}>
+          <option value="">{t("All statuses")}</option>
           {STATUSES.map(([value, label]) => (
             <option key={value} value={value}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
-        <select className="sel" value={ordering} onChange={(e) => setOrdering(e.target.value)} aria-label="Sort">
-          <option value="-created_at">Newest first</option>
-          <option value="created_at">Oldest first</option>
-          <option value="is_read">Unread first</option>
+        <select className="sel" value={ordering} onChange={(e) => setOrdering(e.target.value)} aria-label={t("Sort")}>
+          <option value="-created_at">{t("Newest first")}</option>
+          <option value="created_at">{t("Oldest first")}</option>
+          <option value="is_read">{t("Unread first")}</option>
         </select>
       </div>
 
@@ -242,9 +259,9 @@ export default function MessagesPage() {
         {loading ? (
           <SkeletonRows count={5} />
         ) : error ? (
-          <EmptyState icon="x" tone="clay" title="Couldn't load the inbox" body={error} />
+          <EmptyState icon="x" tone="clay" title={t("Couldn't load the inbox")} body={error} />
         ) : rows.length === 0 ? (
-          <EmptyState icon="inbox" title="No messages" body="Contact form submissions land here." />
+          <EmptyState icon="inbox" title={t("No messages")} body={t("Contact form submissions land here.")} />
         ) : (
           rows.map((m) => (
             <div
@@ -253,18 +270,20 @@ export default function MessagesPage() {
               onClick={() => setOpen(m)}
               style={{
                 cursor: "pointer",
-                background: m.is_read ? undefined : "linear-gradient(90deg, rgba(37,99,235,.05), transparent 40%)",
+                background: m.is_read
+                  ? undefined
+                  : `linear-gradient(${isRtl() ? "270deg" : "90deg"}, rgba(37,99,235,.05), transparent 40%)`,
               }}
             >
               <div className="row-ico" style={m.is_read ? undefined : { color: "var(--color-blue)" }}>
                 <Icon name="inbox" size={15} />
               </div>
               <div className="row-main">
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{m.subject || m.service_title || "(no subject)"}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{m.subject || m.service_title || t("(no subject)")}</div>
                 <div style={{ fontSize: 11.5, color: "var(--color-faint)", marginTop: 2 }}>
                   {m.name} · {primaryContact(m)}
                   {m.company ? ` · ${m.company}` : ""} · {timeAgo(m.created_at)}
-                  {m.utm_source ? ` · via ${m.utm_source}` : ""}
+                  {m.utm_source ? ` · ${t("via {source}", { source: m.utm_source })}` : ""}
                 </div>
               </div>
               <div className="row-meta">
@@ -279,7 +298,7 @@ export default function MessagesPage() {
                       markRead(m);
                     }}
                   >
-                    Mark read
+                    {t("Mark read")}
                   </button>
                 ) : null}
               </div>
@@ -301,19 +320,19 @@ export default function MessagesPage() {
 
       <Drawer
         open={Boolean(open)}
-        title={open?.subject || open?.service_title || "Message"}
+        title={open?.subject || open?.service_title || t("Message")}
         onClose={() => setOpen(null)}
         footer={
           open ? (
             <>
               <button className="btn btn-danger btn-sm" onClick={() => destroy(open)} style={{ marginInlineEnd: "auto" }}>
-                Delete
+                {t("Delete")}
               </button>
               <button className="btn btn-ghost btn-sm" onClick={() => setOpen(null)}>
-                Close
+                {t("Close")}
               </button>
               <button className="btn btn-blue btn-sm" onClick={() => toggleRead(open)}>
-                {open.is_read ? "Mark unread" : "Mark read"}
+                {open.is_read ? t("Mark unread") : t("Mark read")}
               </button>
             </>
           ) : null
@@ -323,7 +342,7 @@ export default function MessagesPage() {
           <>
             <div style={{ marginBottom: 15 }}>
               <div className="field-label" style={{ marginBottom: 6 }}>
-                Status
+                {t("Status")}
               </div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <select
@@ -334,7 +353,7 @@ export default function MessagesPage() {
                 >
                   {STATUSES.map(([value, label]) => (
                     <option key={value} value={value}>
-                      {label}
+                      {t(label)}
                     </option>
                   ))}
                 </select>
@@ -344,40 +363,50 @@ export default function MessagesPage() {
 
             <div style={{ marginBottom: 15 }}>
               <div className="field-label" style={{ marginBottom: 6 }}>
-                From
+                {t("From")}
               </div>
               <div className="input" style={{ background: "var(--color-surface-2)" }}>
                 {open.name}
-                {open.email ? <> &lt;{open.email}&gt;</> : null}
-                {!open.email && open.phone ? <> · {open.phone}</> : null}
+                {open.email ? (
+                  <>
+                    {" "}
+                    <span dir="ltr">&lt;{open.email}&gt;</span>
+                  </>
+                ) : null}
+                {!open.email && open.phone ? (
+                  <>
+                    {" · "}
+                    <span dir="ltr">{open.phone}</span>
+                  </>
+                ) : null}
               </div>
               {open.email && open.phone ? (
                 <div className="hint" style={{ marginTop: 5 }}>
-                  Phone: {open.phone}
+                  {t("Phone:")} <span dir="ltr">{open.phone}</span>
                 </div>
               ) : null}
             </div>
 
             <div style={{ marginBottom: 15 }}>
-              <DetailRow label="Service">{open.service_title || <span className="hint">—</span>}</DetailRow>
-              <DetailRow label="Project type">{open.project_type || <span className="hint">—</span>}</DetailRow>
-              <DetailRow label="Budget">{open.budget_range || <span className="hint">—</span>}</DetailRow>
-              {open.company ? <DetailRow label="Company">{open.company}</DetailRow> : null}
-              <DetailRow label="Language">
-                {open.language ? (LANGUAGE_LABEL[open.language] ?? open.language) : <span className="hint">—</span>}
+              <DetailRow label={t("Service")}>{open.service_title || <span className="hint">—</span>}</DetailRow>
+              <DetailRow label={t("Project type")}>{open.project_type || <span className="hint">—</span>}</DetailRow>
+              <DetailRow label={t("Budget")}>{open.budget_range || <span className="hint">—</span>}</DetailRow>
+              {open.company ? <DetailRow label={t("Company")}>{open.company}</DetailRow> : null}
+              <DetailRow label={t("Language")}>
+                {open.language ? (LANGUAGE_LABEL[open.language] ? t(LANGUAGE_LABEL[open.language]) : open.language) : <span className="hint">—</span>}
               </DetailRow>
-              <DetailRow label="Received">{formatDate(open.created_at)} · {timeAgo(open.created_at)}</DetailRow>
+              <DetailRow label={t("Received")}>{formatDate(open.created_at)} · {timeAgo(open.created_at)}</DetailRow>
             </div>
 
             <div style={{ marginBottom: 15 }}>
               <div className="field-label" style={{ marginBottom: 6 }}>
-                Message
+                {t("Message")}
               </div>
               <div
                 className="input"
                 style={{ background: "var(--color-surface-2)", whiteSpace: "pre-wrap", minHeight: 130 }}
               >
-                {open.message || <span className="hint">(no message)</span>}
+                {open.message || <span className="hint">{t("(no message)")}</span>}
               </div>
             </div>
 
@@ -389,12 +418,12 @@ export default function MessagesPage() {
                   className="btn btn-blue btn-sm"
                   href={`mailto:${open.email}?subject=${encodeURIComponent("Re: " + (open.subject || "Your enquiry"))}`}
                 >
-                  Reply by email
+                  {t("Reply by email")}
                 </a>
               ) : null}
               {open.phone ? (
                 <a className={open.email ? "btn btn-ghost btn-sm" : "btn btn-blue btn-sm"} href={telHref(open.phone)}>
-                  Call {open.phone}
+                  {t("Call")} <span dir="ltr">{open.phone}</span>
                 </a>
               ) : null}
               {open.phone && waDigits(open.phone).length >= 7 ? (
@@ -410,8 +439,8 @@ export default function MessagesPage() {
             </div>
             <p className="hint" style={{ marginTop: 8 }}>
               {open.email
-                ? "Replies go out from your own mail client — the API only stores submissions."
-                : "This lead left a phone number only. WhatsApp needs the number in international format."}
+                ? t("Replies go out from your own mail client — the API only stores submissions.")
+                : t("This lead left a phone number only. WhatsApp needs the number in international format.")}
             </p>
           </>
         ) : null}
